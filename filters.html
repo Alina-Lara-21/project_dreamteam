@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Bridge Job Search</title>
+  <link rel="stylesheet" href="filters.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="logo">
+        <img src="logo.png" alt="Bridge Job Search">
+    <nav>
+      <button>Jobs</button>
+      <button>Companies</button>
+      <button>Salaries</button>
+      <button id="filters-btn">Filters</button>
+    </nav>
+  </header>
+
+  <section class="search-hero">
+    <h1>Your Job <br> Search <br> Starts Here</h1>
+    <p>find whats right for you</p>
+
+    <div class="search-box">
+      <input type="text" placeholder="find jobs aligned with you">
+      <button>Search</button>
+    </div>
+  </section>
+
+<script>
+  document.getElementById("searchBtn").addEventListener("click", function() {
+    const job = document.getElementById("jobInput").value;
+    const location = document.getElementById("locationInput").value;
+
+    if (job === "" || location === "") {
+      alert("Please enter both job and location.");
+    } else {
+      alert("Searching for " + job + " jobs in " + location);
+      // Later you can connect this to a real job database
+    }
+  });
+</script>
+</body>
+</html>
