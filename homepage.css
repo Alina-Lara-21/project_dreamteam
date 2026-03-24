@@ -1,0 +1,106 @@
+/* Reset */
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+}
+
+body{
+font-family: "Segoe UI", Arial, sans-serif;
+background:#f6f7fb;
+color:#333;
+}
+
+/* Navbar */
+
+.navbar{
+display:flex;
+justify-content:space-between;
+align-items:center;
+
+padding:20px 60px;
+
+background:white;
+box-shadow:0 2px 8px rgba(0,0,0,0.05);
+}
+
+.site-title{
+font-weight:600;
+font-size:22px;
+color:#444;
+}
+
+.nav-btn{
+padding:8px 18px;
+border:none;
+border-radius:20px;
+background:#7a8cff;
+color:white;
+cursor:pointer;
+}
+
+/* Hero section */
+
+.hero{
+display:flex;
+flex-direction:column;
+align-items:center;
+justify-content:center;
+
+text-align:center;
+
+height:80vh;
+gap:18px;
+}
+
+/* Logo */
+
+.logo{
+width:420px;
+max-width:80%;
+}
+
+/* Headline */
+
+.headline{
+font-size:36px;
+font-weight:600;
+color:#333;
+}
+
+/* Tagline */
+
+.tagline{
+font-size:18px;
+color:#666;
+max-width:500px;
+}
+
+/* Main button */
+
+.cta-btn{
+
+margin-top:10px;
+
+padding:14px 32px;
+
+border:none;
+border-radius:30px;
+
+font-size:16px;
+font-weight:600;
+
+background:linear-gradient(135deg,#a8c5ff,#7a8cff);
+
+color:white;
+
+cursor:pointer;
+
+box-shadow:0 8px 20px rgba(0,0,0,0.15);
+
+transition:0.2s;
+}
+
+.cta-btn:hover{
+transform:translateY(-3px);
+}

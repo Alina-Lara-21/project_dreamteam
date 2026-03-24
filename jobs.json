@@ -1,0 +1,21 @@
+[
+{
+"id":1,
+"title":"Software Engineer Intern",
+"company":"TechNova",
+"location":"Remote",
+"description":"Work on backend systems and APIs.",
+"requirements":"C++, Data Structures, Algorithms",
+"skills":["c++","algorithms","data structures"]
+},
+
+{
+"id":2,
+"title":"Frontend Developer",
+"company":"BrightWeb",
+"location":"Los Angeles",
+"description":"Build modern web interfaces.",
+"requirements":"HTML, CSS, JavaScript",
+"skills":["html","css","javascript"]
+}
+]
