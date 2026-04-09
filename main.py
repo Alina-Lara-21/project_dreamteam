@@ -92,11 +92,10 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/jobs")
-def get_jobs(
-    skills: str | None = Query(default=None, description="Comma-separated skills"),
-    coursework: str | None = Query(default=None, description="Comma-separated coursework terms"),
-    experience: str | None = Query(default=None, description="Comma-separated experience terms"),
+def get_filtered_jobs(
+    skills: str | None = None,
+    coursework: str | None = None,
+    experience: str | None = None,
 ) -> list[dict[str, Any]]:
     skill_terms = parse_terms(skills)
     coursework_terms = parse_terms(coursework)
@@ -119,4 +118,13 @@ def filter_jobs(
     coursework: str | None = Query(default=None, description="Comma-separated coursework terms"),
     experience: str | None = Query(default=None, description="Comma-separated experience terms"),
 ) -> list[dict[str, Any]]:
-    return get_jobs(skills=skills, coursework=coursework, experience=experience)
+    return get_filtered_jobs(skills=skills, coursework=coursework, experience=experience)
+
+
+@app.get("/jobs")
+def get_jobs(
+    skills: str | None = Query(default=None, description="Comma-separated skills"),
+    coursework: str | None = Query(default=None, description="Comma-separated coursework terms"),
+    experience: str | None = Query(default=None, description="Comma-separated experience terms"),
+) -> list[dict[str, Any]]:
+    return get_filtered_jobs(skills=skills, coursework=coursework, experience=experience)
