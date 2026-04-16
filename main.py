@@ -4,6 +4,7 @@ from typing import Any
 
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
+from matching import rank_jobs
 from skill_extraction import extract_skills
 
 
@@ -187,3 +188,21 @@ def get_jobs(
     experience: str | None = Query(default=None, description="Comma-separated experience terms"),
 ) -> dict[str, Any]:
     return jobs_response(skills=skills, coursework=coursework, experience=experience)
+
+
+@app.get("/jobs/match")
+def match_jobs(
+    skills: str | None = Query(default=None, description="Comma-separated skills"),
+    coursework: str | None = Query(default=None, description="Comma-separated coursework terms"),
+    experience: str | None = Query(default=None, description="Comma-separated experience terms"),
+    top_k: int | None = Query(default=None, description="Optional number of top results"),
+) -> dict[str, Any]:
+    jobs = get_filtered_jobs()
+    results = rank_jobs(
+        jobs=jobs,
+        skills=skills,
+        coursework=coursework,
+        experience=experience,
+        top_k=top_k,
+    )
+    return {"status": "ok", "count": len(results), "results": results}
