@@ -4,6 +4,7 @@ from typing import Any
 
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
+from skill_extraction import extract_skills
 
 
 app = FastAPI(title="Career Path API")
@@ -41,9 +42,18 @@ def normalize_job(job: dict[str, Any], fallback_id: int) -> dict[str, Any]:
     description = str(job.get("description") or "")
     requirements = str(job.get("requirements") or job.get("skills_desc") or "")
 
-    skills = to_list_of_strings(job.get("skills"))
-    soft_skills = to_list_of_strings(job.get("soft_skills"))
-    hard_skills = to_list_of_strings(job.get("hard_skills"))
+    extracted = extract_skills(
+        description=description,
+        requirements=requirements,
+        existing_skills=job.get("skills"),
+    )
+    skills = sorted(set(extracted["skills"] + to_list_of_strings(job.get("skills"))))
+    soft_skills = sorted(
+        set(extracted["soft_skills"] + to_list_of_strings(job.get("soft_skills")))
+    )
+    hard_skills = sorted(
+        set(extracted["hard_skills"] + to_list_of_strings(job.get("hard_skills")))
+    )
 
     return {
         "id": job_id,
@@ -144,10 +154,10 @@ def get_filtered_jobs(
         filtered_jobs = jobs
     else:
         filtered_jobs = [
-        job
-        for job in jobs
-        if matches_filters(job, skill_terms, coursework_terms, experience_terms)
-    ]
+            job
+            for job in jobs
+            if matches_filters(job, skill_terms, coursework_terms, experience_terms)
+        ]
 
     return [normalize_job(job, index + 1) for index, job in enumerate(filtered_jobs)]
 
