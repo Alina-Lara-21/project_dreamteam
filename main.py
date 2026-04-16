@@ -20,6 +20,44 @@ app.add_middleware(
 DATA_FILE = Path(__file__).with_name("jobs.json")
 
 
+def to_list_of_strings(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    if isinstance(value, str):
+        return [item.strip() for item in value.split(",") if item.strip()]
+    return []
+
+
+def normalize_job(job: dict[str, Any], fallback_id: int) -> dict[str, Any]:
+    job_id = job.get("id")
+    if job_id in (None, ""):
+        job_id = job.get("job_id")
+    if job_id in (None, ""):
+        job_id = fallback_id
+
+    title = str(job.get("title") or "Untitled role")
+    company = str(job.get("company") or job.get("company_name") or "Unknown company")
+    location = str(job.get("location") or "Location not listed")
+    description = str(job.get("description") or "")
+    requirements = str(job.get("requirements") or job.get("skills_desc") or "")
+
+    skills = to_list_of_strings(job.get("skills"))
+    soft_skills = to_list_of_strings(job.get("soft_skills"))
+    hard_skills = to_list_of_strings(job.get("hard_skills"))
+
+    return {
+        "id": job_id,
+        "title": title,
+        "company": company,
+        "location": location,
+        "description": description,
+        "requirements": requirements,
+        "skills": skills,
+        "soft_skills": soft_skills,
+        "hard_skills": hard_skills,
+    }
+
+
 def load_jobs() -> list[dict[str, Any]]:
     if not DATA_FILE.exists():
         return []
@@ -103,13 +141,24 @@ def get_filtered_jobs(
 
     jobs = load_jobs()
     if not any([skill_terms, coursework_terms, experience_terms]):
-        return jobs
-
-    return [
+        filtered_jobs = jobs
+    else:
+        filtered_jobs = [
         job
         for job in jobs
         if matches_filters(job, skill_terms, coursework_terms, experience_terms)
     ]
+
+    return [normalize_job(job, index + 1) for index, job in enumerate(filtered_jobs)]
+
+
+def jobs_response(
+    skills: str | None = None,
+    coursework: str | None = None,
+    experience: str | None = None,
+) -> dict[str, Any]:
+    jobs = get_filtered_jobs(skills=skills, coursework=coursework, experience=experience)
+    return {"status": "ok", "count": len(jobs), "jobs": jobs}
 
 
 @app.get("/jobs/filter")
@@ -117,8 +166,8 @@ def filter_jobs(
     skills: str | None = Query(default=None, description="Comma-separated skills"),
     coursework: str | None = Query(default=None, description="Comma-separated coursework terms"),
     experience: str | None = Query(default=None, description="Comma-separated experience terms"),
-) -> list[dict[str, Any]]:
-    return get_filtered_jobs(skills=skills, coursework=coursework, experience=experience)
+) -> dict[str, Any]:
+    return jobs_response(skills=skills, coursework=coursework, experience=experience)
 
 
 @app.get("/jobs")
@@ -126,5 +175,5 @@ def get_jobs(
     skills: str | None = Query(default=None, description="Comma-separated skills"),
     coursework: str | None = Query(default=None, description="Comma-separated coursework terms"),
     experience: str | None = Query(default=None, description="Comma-separated experience terms"),
-) -> list[dict[str, Any]]:
-    return get_filtered_jobs(skills=skills, coursework=coursework, experience=experience)
+) -> dict[str, Any]:
+    return jobs_response(skills=skills, coursework=coursework, experience=experience)
