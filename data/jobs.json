@@ -1,0 +1,98 @@
+[
+  {
+    "id": 1,
+    "title": "Backend Intern",
+    "company": "TechCorp",
+    "skills_required": ["python", "sql", "aws", "rest api"],
+    "salary_range": "$70k-$90k",
+    "location": "Remote"
+  },
+  {
+    "id": 2,
+    "title": "Frontend Developer Intern",
+    "company": "BrightWeb",
+    "skills_required": ["javascript", "react", "css", "html"],
+    "salary_range": "$65k-$85k",
+    "location": "Los Angeles, CA"
+  },
+  {
+    "id": 3,
+    "title": "Full Stack Engineer",
+    "company": "BridgeLabs",
+    "skills_required": ["python", "react", "postgresql", "docker"],
+    "salary_range": "$95k-$125k",
+    "location": "Austin, TX"
+  },
+  {
+    "id": 4,
+    "title": "Junior Data Engineer",
+    "company": "DataFlow",
+    "skills_required": ["python", "sql", "data modeling", "etl"],
+    "salary_range": "$85k-$110k",
+    "location": "Chicago, IL"
+  },
+  {
+    "id": 5,
+    "title": "QA Automation Engineer",
+    "company": "QualityWorks",
+    "skills_required": ["python", "selenium", "testing", "ci/cd"],
+    "salary_range": "$78k-$102k",
+    "location": "Remote"
+  },
+  {
+    "id": 6,
+    "title": "DevOps Intern",
+    "company": "CloudBridge",
+    "skills_required": ["linux", "docker", "aws", "ci/cd"],
+    "salary_range": "$72k-$92k",
+    "location": "Seattle, WA"
+  },
+  {
+    "id": 7,
+    "title": "Software Engineer I",
+    "company": "CodeStream",
+    "skills_required": ["java", "algorithms", "git", "problem solving"],
+    "salary_range": "$88k-$118k",
+    "location": "Denver, CO"
+  },
+  {
+    "id": 8,
+    "title": "API Integration Developer",
+    "company": "NexaSoft",
+    "skills_required": ["python", "rest api", "json", "sql"],
+    "salary_range": "$82k-$108k",
+    "location": "Remote"
+  },
+  {
+    "id": 9,
+    "title": "Product Engineering Intern",
+    "company": "UpGrid",
+    "skills_required": ["javascript", "react", "problem solving", "git"],
+    "salary_range": "$68k-$88k",
+    "location": "San Diego, CA"
+  },
+  {
+    "id": 10,
+    "title": "Platform Engineer",
+    "company": "InfraNova",
+    "skills_required": ["python", "kubernetes", "docker", "aws"],
+    "salary_range": "$105k-$140k",
+    "location": "New York, NY"
+  },
+  {
+    "id": 11,
+    "title": "Database Developer",
+    "company": "QueryPoint",
+    "skills_required": ["sql", "data modeling", "postgresql", "performance tuning"],
+    "salary_range": "$90k-$120k",
+    "location": "Boston, MA"
+  },
+  {
+    "id": 12,
+    "title": "Machine Learning Platform Intern",
+    "company": "ModelOps Labs",
+    "skills_required": ["python", "sql", "docker", "linux"],
+    "salary_range": "$80k-$104k",
+    "location": "Remote"
+  }
+]
