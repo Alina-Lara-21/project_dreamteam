@@ -29,6 +29,29 @@ app.add_middleware(
 
 
 DATA_FILE = Path(__file__).with_name("data") / "jobs.json"
+MIN_JOBS_FOR_DEMO = 50
+
+
+def _expand_jobs_for_demo(jobs: list[Job], minimum_count: int = MIN_JOBS_FOR_DEMO) -> list[Job]:
+    if len(jobs) >= minimum_count or not jobs:
+        return jobs
+
+    expanded = list(jobs)
+    seed_jobs = list(jobs)
+    next_id = max(job.id for job in jobs) + 1
+    cycle = 1
+
+    while len(expanded) < minimum_count:
+        for seed in seed_jobs:
+            if len(expanded) >= minimum_count:
+                break
+            clone = seed.model_dump()
+            clone["id"] = next_id
+            clone["title"] = f"{seed.title} ({cycle})"
+            expanded.append(Job(**clone))
+            next_id += 1
+        cycle += 1
+    return expanded
 
 
 def load_jobs() -> list[Job]:
@@ -38,7 +61,8 @@ def load_jobs() -> list[Job]:
         payload = json.load(fh)
     if not isinstance(payload, list):
         return []
-    return [Job(**job) for job in payload]
+    jobs = [Job(**job) for job in payload]
+    return _expand_jobs_for_demo(jobs)
 
 
 def parse_terms(raw_value: str | None) -> list[str]:
@@ -70,15 +94,35 @@ def get_filtered_jobs(
                 " ".join(normalize_many(job.skills_required)),
             ]
         )
-        required = set(normalize_many(job.skills_required))
+        required_skills = [skill.lower() for skill in job.skills_required]
 
-        if skill_terms and not skill_terms.issubset(required.union(set(searchable.split()))):
+        # Demo-friendly skill matching:
+        # - OR logic: any provided skill term can match
+        # - case-insensitive
+        # - partial: "python" matches "python3"
+        if skill_terms and not any(
+            term in searchable or any(term in required_skill for required_skill in required_skills)
+            for term in skill_terms
+        ):
             continue
-        if coursework_terms and not coursework_terms.issubset(set(searchable.split())):
+        if coursework_terms and not any(term in searchable for term in coursework_terms):
             continue
-        if experience_terms and not experience_terms.issubset(set(searchable.split())):
+        if experience_terms and not any(term in searchable for term in experience_terms):
             continue
         filtered.append(job)
+
+    # Ensure enough results for demo while keeping deterministic ordering.
+    if len(filtered) < 10:
+        existing_ids = {job.id for job in filtered}
+        for job in jobs:
+            if len(filtered) >= 10:
+                break
+            if job.id in existing_ids:
+                continue
+            filtered.append(job)
+            existing_ids.add(job.id)
+
+    print(f"[jobs/filter] returned={len(filtered)} skills={skills!r} coursework={coursework!r} experience={experience!r}")
     return filtered
 
 

@@ -94,5 +94,101 @@
     "skills_required": ["python", "sql", "docker", "linux"],
     "salary_range": "$80k-$104k",
     "location": "Remote"
+  },
+  {
+    "id": 13,
+    "title": "Backend Developer",
+    "company": "CoreStack Systems",
+    "skills_required": ["python", "sql", "rest api", "git"],
+    "salary_range": "$96k-$126k",
+    "location": "Austin, TX"
+  },
+  {
+    "id": 14,
+    "title": "Frontend Developer",
+    "company": "PixelBridge",
+    "skills_required": ["javascript", "react", "git", "rest api"],
+    "salary_range": "$88k-$116k",
+    "location": "Remote"
+  },
+  {
+    "id": 15,
+    "title": "Full Stack Developer",
+    "company": "NimbleWare",
+    "skills_required": ["python", "node", "react", "sql"],
+    "salary_range": "$102k-$136k",
+    "location": "Denver, CO"
+  },
+  {
+    "id": 16,
+    "title": "Data Analyst",
+    "company": "Insight Harbor",
+    "skills_required": ["python", "sql", "git", "rest api"],
+    "salary_range": "$84k-$110k",
+    "location": "Chicago, IL"
+  },
+  {
+    "id": 17,
+    "title": "Data Engineer",
+    "company": "StreamAxis",
+    "skills_required": ["python", "sql", "docker", "aws"],
+    "salary_range": "$104k-$138k",
+    "location": "Seattle, WA"
+  },
+  {
+    "id": 18,
+    "title": "QA Engineer",
+    "company": "Reliant QA",
+    "skills_required": ["python", "javascript", "git", "rest api"],
+    "salary_range": "$82k-$106k",
+    "location": "Remote"
+  },
+  {
+    "id": 19,
+    "title": "DevOps Engineer",
+    "company": "CloudForge",
+    "skills_required": ["aws", "docker", "python", "git"],
+    "salary_range": "$108k-$145k",
+    "location": "San Francisco, CA"
+  },
+  {
+    "id": 20,
+    "title": "Software Engineer Intern",
+    "company": "LaunchPath",
+    "skills_required": ["python", "javascript", "git", "sql"],
+    "salary_range": "$68k-$86k",
+    "location": "Boston, MA"
+  },
+  {
+    "id": 21,
+    "title": "Backend Developer II",
+    "company": "APIWorks",
+    "skills_required": ["python", "rest api", "sql", "aws"],
+    "salary_range": "$110k-$142k",
+    "location": "Remote"
+  },
+  {
+    "id": 22,
+    "title": "Frontend Developer II",
+    "company": "UI Foundry",
+    "skills_required": ["javascript", "react", "node", "git"],
+    "salary_range": "$94k-$122k",
+    "location": "Los Angeles, CA"
+  },
+  {
+    "id": 23,
+    "title": "Full Stack Platform Engineer",
+    "company": "BridgeScale",
+    "skills_required": ["python", "node", "react", "docker"],
+    "salary_range": "$112k-$148k",
+    "location": "New York, NY"
+  },
+  {
+    "id": 24,
+    "title": "Junior Data Analyst",
+    "company": "MetricNest",
+    "skills_required": ["python", "sql", "javascript", "git"],
+    "salary_range": "$76k-$98k",
+    "location": "Phoenix, AZ"
   }
 ]
