@@ -1,3 +1,6 @@
 __pycache__/
 *.pyc
 #leetcode 85.py
+.env
+node_modules/
+dist/
