@@ -1,47 +1,137 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
-<title>JobFinder</title>
-<link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JobFinder - Jobs</title>
+  <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
 
-<header>
-<img src="images/logo.png">
+<nav class="navbar">
+  <div class="nav-left">
+    <h1 class="logo">BRIDGE</h1>
+    <span class="tagline">Smart Job Matching Platform</span>
+  </div>
 
-<nav>
-<a href="explore.html">Explore Jobs</a>
-<a href="search.html">Smart Search</a>
-<a href="saved.html">Saved Jobs</a>
+  <div class="nav-right">
+    <a href="index.html"><button class="nav-btn">Jobs</button></a>
+    <a href="compare.html"><button class="nav-btn">Compare</button></a>
+    <a href="tracker.html"><button class="nav-btn">Tracker</button></a>
+    <a href="profile.html"><button class="nav-btn">Profile</button></a>
+  </div>
 </nav>
-</header>
 
-<section class="hero">
+<div class="layout">
 
-<h1>Find Your Next Opportunity</h1>
+  <!-- SIDEBAR FILTERS -->
+  <aside class="sidebar">
+    <h2>Filters</h2>
 
-<p>
-Discover jobs based on your coursework, skills, and experience —
-or explore open positions instantly.
-</p>
+    <div class="filter-group">
+      <label>Skills</label>
+      <input id="skillsInput" placeholder="Python, Java, SQL">
+    </div>
 
-<div class="hero-buttons">
+    <div class="filter-group">
+      <label>Coursework</label>
+      <input id="courseworkInput" placeholder="Data Structures, Databases">
+    </div>
 
-<button class="btn btn-primary"
-onclick="location.href='search.html'">
-Smart Job Match
-</button>
+    <div class="filter-group">
+      <label>Experience / Projects</label>
+      <input id="experienceInput" placeholder="Portfolio Website, Internship">
+    </div>
 
-<button class="btn btn-secondary"
-onclick="location.href='explore.html'">
-Explore Jobs
-</button>
+    <!-- JOB TYPE BUBBLES -->
+    <div class="filter-group">
+      <label>Job Type</label>
+      <div class="type-bubbles">
+        <button class="bubble" data-type="Full-Time">Full-Time</button>
+        <button class="bubble" data-type="Part-Time">Part-Time</button>
+        <button class="bubble" data-type="Internship">Internship</button>
+      </div>
+    </div>
+
+    <!-- LOCATION -->
+    <div class="filter-group">
+      <label>Location Preference</label>
+      <input id="locationInput" placeholder="Austin, TX or Remote">
+    </div>
+
+    <div class="filter-buttons">
+      <button class="primary" id="filterBtn">Apply</button>
+      <button class="secondary" id="clearBtn">Clear</button>
+    </div>
+
+    <div class="filter-tip">
+      Tip: separate values using commas
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <section class="job-results">
+
+    <!-- HERO -->
+    <div class="hero">
+      <div>
+        <h2>Find Your Next Opportunity</h2>
+        <p>Search internships, part-time, and full-time roles matched to your skills.</p>
+      </div>
+
+      <div class="hero-stats">
+        <div class="stat-box">
+          <h3 id="totalJobsCount">0</h3>
+          <p>Total Jobs</p>
+        </div>
+        <div class="stat-box">
+          <h3 id="savedJobsCount">0</h3>
+          <p>Saved Jobs</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI RECOMMENDED -->
+    <div class="ai-recommendations">
+      <h2>AI Recommendations</h2>
+      <p class="subtext">Top matches based on your profile information.</p>
+      <div id="recommendedJobs" class="recommended-grid"></div>
+    </div>
+
+    <!-- SEARCH + SORT -->
+    <div class="results-header">
+      <div>
+        <h2>All Jobs</h2>
+        <p id="resultsCount"></p>
+      </div>
+
+      <div class="top-controls">
+        <input id="searchBar" placeholder="Search job titles...">
+
+        <select id="sortSelect">
+          <option value="best">Best Match</option>
+          <option value="newest">Newest</option>
+          <option value="az">A-Z</option>
+          <option value="za">Z-A</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- JOB LIST -->
+    <div id="jobList"></div>
+
+  </section>
 
 </div>
 
-</section>
+<!-- JOB MODAL -->
+<div id="jobModal" class="modal hidden">
+  <div class="modal-content">
+    <span class="close" id="closeModal">&times;</span>
+    <div id="jobDetails"></div>
+  </div>
+</div>
 
+<script src="script.js"></script>
 </body>
 </html>

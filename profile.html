@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JobFinder - Profile</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="nav-left">
+    <h1 class="logo">JobFinder</h1>
+    <span class="tagline">User Profile</span>
+  </div>
+
+  <div class="nav-right">
+    <a href="index.html"><button class="nav-btn">Jobs</button></a>
+    <a href="compare.html"><button class="nav-btn">Compare</button></a>
+    <a href="tracker.html"><button class="nav-btn">Tracker</button></a>
+    <a href="profile.html"><button class="nav-btn">Profile</button></a>
+  </div>
+</nav>
+
+<section class="page-container">
+
+  <!-- PROFILE HERO -->
+  <div class="profile-hero">
+    <div class="profile-left">
+      <div class="profile-avatar" id="profileAvatar">U</div>
+
+      <div>
+        <h2 id="profileHeaderName">My Profile</h2>
+        <p class="profile-subtext">
+          Save your skills and preferences so JobFinder can automatically match jobs.
+        </p>
+
+        <div class="profile-progress">
+          <div class="progress-label">
+            <span>Profile Completion</span>
+            <span id="profilePercent">0%</span>
+          </div>
+
+          <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="profile-right">
+      <div class="profile-stat">
+        <h3 id="profileSavedJobs">0</h3>
+        <p>Saved Jobs</p>
+      </div>
+
+      <div class="profile-stat">
+        <h3 id="profileCompareJobs">0</h3>
+        <p>Compare List</p>
+      </div>
+
+      <div class="profile-stat">
+        <h3 id="profileTrackerJobs">0</h3>
+        <p>Tracked Jobs</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- FORM CARD -->
+  <div class="profile-card">
+
+    <h3 class="section-title">Personal Information</h3>
+
+    <div class="profile-grid">
+      <div class="filter-group">
+        <label>Full Name</label>
+        <input id="profileName" placeholder="John Doe">
+      </div>
+
+      <div class="filter-group">
+        <label>Email</label>
+        <input id="profileEmail" placeholder="example@email.com">
+      </div>
+    </div>
+
+    <h3 class="section-title" style="margin-top:25px;">Career Preferences</h3>
+
+    <div class="profile-grid">
+      <div class="filter-group">
+        <label>Skills</label>
+        <input id="profileSkills" placeholder="Python, JavaScript, SQL">
+      </div>
+
+      <div class="filter-group">
+        <label>Coursework</label>
+        <input id="profileCoursework" placeholder="Data Structures, OS, Web Dev">
+      </div>
+
+      <div class="filter-group">
+        <label>Experience</label>
+        <input id="profileExperience" placeholder="Projects, Internship, Volunteer">
+      </div>
+
+      <div class="filter-group">
+        <label>Preferred Location</label>
+        <input id="profileLocation" placeholder="Austin, TX or Remote">
+      </div>
+    </div>
+
+    <div class="filter-group" style="margin-top:15px;">
+      <label>Preferred Job Types</label>
+      <div class="type-bubbles">
+        <button class="bubble" data-type="Full-Time">Full-Time</button>
+        <button class="bubble" data-type="Part-Time">Part-Time</button>
+        <button class="bubble" data-type="Internship">Internship</button>
+      </div>
+    </div>
+
+    <h3 class="section-title" style="margin-top:25px;">Resume Upload</h3>
+
+    <div class="resume-box">
+      <p class="resume-text">
+        Upload your resume in <strong>.txt</strong> format. JobFinder will scan it and extract skills automatically.
+      </p>
+
+      <input type="file" id="resumeUpload" accept=".txt" class="resume-upload">
+
+      <textarea id="resumePreview"
+        class="resume-preview"
+        placeholder="Resume text will appear here..."></textarea>
+    </div>
+
+    <div class="profile-actions">
+      <button class="save-btn" id="saveProfileBtn">Save Profile</button>
+      <button class="danger-btn" id="clearProfileBtn">Clear Profile</button>
+    </div>
+
+  </div>
+
+</section>
+
+<script src="profile.js"></script>
+</body>
+</html>
