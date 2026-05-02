@@ -1,289 +1,407 @@
-const API_BASE_URL_STORAGE_KEY = "JOB_API_BASE_URL";
-const API_BASE_URL = resolveApiBaseUrl();
+//////////////////////////////////////////////////////
+// BACKEND URL
+//////////////////////////////////////////////////////
 
-let backendHealth = {
-  checked: false,
-  ok: false,
-};
+const API_BASE = "http://127.0.0.1:8000";
 
-function resolveApiBaseUrl() {
-  const fromQuery = new URLSearchParams(window.location.search).get("apiBase");
-  if (typeof fromQuery === "string" && fromQuery.trim()) {
-    return fromQuery.trim().replace(/\/+$/, "");
-  }
+//////////////////////////////////////////////////////
+// STATE
+//////////////////////////////////////////////////////
 
-  const fromWindow = window.JOB_API_BASE_URL;
-  if (typeof fromWindow === "string" && fromWindow.trim()) {
-    return fromWindow.trim().replace(/\/+$/, "");
-  }
+let jobs = [];
+let matchResults = [];
+let selectedType = null;
+let currentSearch = "";
+let currentSort = "best";
 
-  const fromStorage = localStorage.getItem(API_BASE_URL_STORAGE_KEY);
-  if (typeof fromStorage === "string" && fromStorage.trim()) {
-    return fromStorage.trim().replace(/\/+$/, "");
-  }
+//////////////////////////////////////////////////////
+// PROFILE STORAGE
+//////////////////////////////////////////////////////
 
-  return window.location.origin.replace(/\/+$/, "");
+function getUserProfile() {
+  return JSON.parse(localStorage.getItem("userProfile")) || {
+    skills: [],
+    courses: [],
+    projects: [],
+    resume_text: ""
+  };
 }
 
-async function readErrorBody(response) {
+function saveUserProfile(profile) {
+  localStorage.setItem("userProfile", JSON.stringify(profile));
+}
+
+//////////////////////////////////////////////////////
+// HELPERS
+//////////////////////////////////////////////////////
+
+function parseCommaList(text) {
+  return (text || "")
+    .split(",")
+    .map(x => x.trim())
+    .filter(Boolean);
+}
+
+function updateSavedCount() {
+  const saved = JSON.parse(localStorage.getItem("savedJobs")) || [];
+  document.getElementById("savedJobsCount").textContent = saved.length;
+}
+
+//////////////////////////////////////////////////////
+// FETCH JOBS
+//////////////////////////////////////////////////////
+
+async function fetchJobs() {
   try {
-    return await response.text();
-  } catch (_) {
-    return "";
-  }
-}
-
-function normalizeJobsPayload(payload) {
-  if (Array.isArray(payload)) return payload;
-  if (payload && Array.isArray(payload.jobs)) return payload.jobs;
-  return [];
-}
-
-async function ensureBackendHealthy() {
-  if (backendHealth.checked && backendHealth.ok) {
-    return;
-  }
-
-  const url = `${API_BASE_URL}/health`;
-  console.log("[API] health-check request", { endpoint: url, queryParams: {} });
-
-  let response;
-  try {
-    response = await fetch(url);
+    const response = await fetch(`${API_BASE}/jobs`);
+    const data = await response.json();
+    jobs = data.jobs || [];
+    document.getElementById("totalJobsCount").textContent = jobs.length;
   } catch (error) {
-    console.error("[API] health-check network error", {
-      endpoint: url,
-      error: error.message,
+    console.error("Error fetching jobs:", error);
+  }
+}
+
+//////////////////////////////////////////////////////
+// FETCH MATCHES (BACKEND AI MATCHER)
+//////////////////////////////////////////////////////
+
+async function fetchMatches(skills, courses, resumeText) {
+  try {
+    const response = await fetch("http://127.0.0.1:8000/match", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        skills,
+        courses,
+        projects: [],
+        resume_text: resumeText.trim() || ""
+      })
     });
-    throw new Error(
-      "Backend is unavailable. Start FastAPI or update JOB_API_BASE_URL."
+
+    const data = await response.json();
+    return data.matches || [];
+
+  } catch (error) {
+    console.error("Error fetching matches:", error);
+    return [];
+  }
+}
+
+//////////////////////////////////////////////////////
+// SAVE + COMPARE
+//////////////////////////////////////////////////////
+
+function saveJob(job) {
+  let saved = JSON.parse(localStorage.getItem("savedJobs")) || [];
+
+  if (!saved.find(j => j.id === job.id)) {
+    saved.push(job);
+    localStorage.setItem("savedJobs", JSON.stringify(saved));
+  }
+
+  updateSavedCount();
+}
+
+function compareJob(job) {
+  let compare = JSON.parse(localStorage.getItem("compareJobs")) || [];
+
+  if (!compare.find(j => j.id === job.id)) {
+    compare.push(job);
+    localStorage.setItem("compareJobs", JSON.stringify(compare));
+    alert("Added to Compare!");
+  }
+}
+
+//////////////////////////////////////////////////////
+// APPLY FILTERS + SORT
+//////////////////////////////////////////////////////
+
+function applyFilters(list) {
+  let filtered = [...list];
+
+  // SEARCH
+  if (currentSearch) {
+    filtered = filtered.filter(item =>
+      item.title.toLowerCase().includes(currentSearch.toLowerCase()) ||
+      item.company.toLowerCase().includes(currentSearch.toLowerCase())
     );
   }
 
-  console.log("[API] health-check response", {
-    endpoint: url,
-    status: response.status,
-  });
+  // FILTER BY TYPE
+  if (selectedType) {
+    filtered = filtered.filter(item => item.type === selectedType);
+  }
 
-  if (!response.ok) {
-    const body = await readErrorBody(response);
-    console.error("[API] health-check failed", {
-      endpoint: url,
-      status: response.status,
-      body,
-    });
-    throw new Error(
-      "Backend health check failed. Confirm the API server is running."
+  // LOCATION FILTER
+  const locInput = document.getElementById("locationInput").value.trim();
+  if (locInput) {
+    filtered = filtered.filter(item =>
+      (item.location || "").toLowerCase().includes(locInput.toLowerCase())
     );
   }
 
-  backendHealth.checked = true;
-  backendHealth.ok = true;
-}
-
-function buildFilterParams(filters = {}) {
-  const params = new URLSearchParams();
-
-  if (filters.skills) {
-    params.set("skills", filters.skills);
+  // SORTING
+  if (currentSort === "best") {
+    filtered.sort((a, b) => (b.match_score || 0) - (a.match_score || 0));
   }
 
-  if (filters.coursework) {
-    params.set("coursework", filters.coursework);
+  if (currentSort === "az") {
+    filtered.sort((a, b) => a.title.localeCompare(b.title));
   }
 
-  if (filters.experience) {
-    params.set("experience", filters.experience);
+  if (currentSort === "za") {
+    filtered.sort((a, b) => b.title.localeCompare(a.title));
   }
 
-  return params;
+  return filtered;
 }
 
-async function getJobs(filters = {}) {
-  await ensureBackendHealthy();
+//////////////////////////////////////////////////////
+// RENDER AI RECOMMENDATIONS
+//////////////////////////////////////////////////////
 
-  const params = buildFilterParams(filters);
-  const query = params.toString();
-  const suffix = query ? `?${query}` : "";
-  const endpoints = ["/jobs/filter", "/jobs"];
-
-  for (const endpoint of endpoints) {
-    const url = `${API_BASE_URL}${endpoint}${suffix}`;
-    console.log("[API] jobs request", {
-      endpoint: `${API_BASE_URL}${endpoint}`,
-      queryParams: Object.fromEntries(params.entries()),
-    });
-    const response = await fetch(url);
-    console.log("[API] jobs response", {
-      endpoint: `${API_BASE_URL}${endpoint}`,
-      status: response.status,
-    });
-
-    if (response.status === 404) {
-      continue;
-    }
-
-    if (!response.ok) {
-      const body = await readErrorBody(response);
-      console.error("[API] jobs request failed", {
-        endpoint: `${API_BASE_URL}${endpoint}`,
-        queryParams: Object.fromEntries(params.entries()),
-        status: response.status,
-        body,
-      });
-      throw new Error(`Failed to fetch jobs: HTTP ${response.status}`);
-    }
-
-    const payload = await response.json();
-    return normalizeJobsPayload(payload);
-  }
-
-  throw new Error("No compatible FastAPI jobs endpoint found.");
-}
-
-function createJobCard(job) {
-  const card = document.createElement("div");
-  card.className = "job-card";
-
-  const id = job.id ?? job.job_id;
-
-  card.innerHTML = `
-<h3>${job.title || "Untitled role"}</h3>
-<p>${job.company || job.company_name || "Unknown company"}</p>
-<p>${job.location || "Location not listed"}</p>
-<button class="save-btn">Save Job</button>
-`;
-
-  card.onclick = () => {
-    if (id !== undefined && id !== null) {
-      window.location = `job.html?id=${id}`;
-    }
-  };
-
-  card.querySelector("button").onclick = (e) => {
-    e.stopPropagation();
-    if (id !== undefined && id !== null) {
-      saveJob(id);
-    }
-  };
-
-  return card;
-}
-
-function renderJobs(container, jobs, emptyMessage) {
-  if (!container) return;
-
+function renderRecommendations() {
+  const container = document.getElementById("recommendedJobs");
   container.innerHTML = "";
 
-  if (!jobs.length) {
-    container.innerHTML = `<p>${emptyMessage}</p>`;
+  const ranked = [...matchResults].sort((a, b) => b.match_score - a.match_score);
+  const top3 = ranked.slice(0, 3);
+
+  if (top3.length === 0) {
+    container.innerHTML = `<p style="color:#555;">Enter skills or upload resume in Profile to see AI matches.</p>`;
     return;
   }
 
-  jobs.forEach((job) => {
-    container.appendChild(createJobCard(job));
+  top3.forEach(match => {
+    const card = document.createElement("div");
+    card.className = "recommended-card";
+
+    card.addEventListener("click", () => openJobModal(match.job_id));
+
+    card.innerHTML = `
+      <h3>${match.title}</h3>
+      <p>${match.company}</p>
+      <span class="match-pill">${match.match_score}% Match</span>
+    `;
+
+    container.appendChild(card);
   });
 }
 
-async function loadAllJobs() {
-  const container = document.getElementById("jobResults");
-  if (!container) return;
+//////////////////////////////////////////////////////
+// RENDER JOB LIST
+//////////////////////////////////////////////////////
 
-  try {
-    const jobs = await getJobs();
-    renderJobs(container, jobs, "No job postings available right now.");
-  } catch (err) {
-    console.error("[UI] loadAllJobs failed", { error: err.message });
-    container.innerHTML = `<p>We couldn't reach the backend right now. Please check that FastAPI is running and try again.</p><p><small>${err.message}</small></p>`;
-  }
+function displayJobs() {
+  const container = document.getElementById("jobList");
+  container.innerHTML = "";
+
+  // Merge match results with job data
+  let combined = jobs.map(job => {
+    const match = matchResults.find(m => m.job_id === job.id);
+
+    return {
+      ...job,
+      match_score: match ? match.match_score : 0,
+      matched_skills: match ? match.matched_skills : [],
+      missing_skills: match ? match.missing_skills : [],
+      explanation: match ? match.explanation : "No match data yet."
+    };
+  });
+
+  combined = applyFilters(combined);
+
+  document.getElementById("resultsCount").textContent = `${combined.length} results`;
+
+  combined.forEach(job => {
+    const card = document.createElement("div");
+    card.className = "job-card";
+
+    card.addEventListener("click", () => openJobModal(job.id));
+
+    card.innerHTML = `
+      <div style="display:flex;justify-content:space-between;">
+        <div>
+          <div class="job-title">${job.title}</div>
+          <div class="job-company">${job.company} • ${job.location || "Location not listed"}</div>
+        </div>
+
+        <div style="text-align:right;">
+          <span class="tag">${job.salary_range || "Salary not listed"}</span>
+          <div style="margin-top:5px;font-weight:900;color:#3a86ff;">
+            ${job.match_score}% Match
+          </div>
+        </div>
+      </div>
+
+      <div class="job-meta">
+        ${job.matched_skills.slice(0, 4).map(s => `<span class="tag">${s}</span>`).join("")}
+      </div>
+
+      <p style="margin-top:10px;font-size:0.85rem;color:#444;">
+        ${job.explanation}
+      </p>
+
+      <div class="job-actions">
+        <button class="save-btn">Save</button>
+        <button class="compare-btn">Compare</button>
+      </div>
+    `;
+
+    const saveBtn = card.querySelector(".save-btn");
+    const compareBtn = card.querySelector(".compare-btn");
+
+    saveBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      saveJob(job);
+    });
+
+    compareBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      compareJob(job);
+    });
+
+    container.appendChild(card);
+  });
 }
 
-async function findJobs() {
-  const skills = document.getElementById("skills")?.value?.trim() || "";
-  const coursework = document.getElementById("coursework")?.value?.trim() || "";
-  const experience = document.getElementById("experience")?.value?.trim() || "";
-  const container = document.getElementById("jobResults");
+//////////////////////////////////////////////////////
+// JOB MODAL
+//////////////////////////////////////////////////////
 
-  if (!container) return;
+function openJobModal(jobId) {
+  const modal = document.getElementById("jobModal");
+  const details = document.getElementById("jobDetails");
 
-  try {
-    const jobs = await getJobs({ skills, coursework, experience });
-    renderJobs(container, jobs, "No matches found for your current filters.");
-  } catch (err) {
-    console.error("[UI] findJobs failed", { error: err.message });
-    container.innerHTML = `<p>We couldn't load filtered jobs because the backend is unavailable.</p><p><small>${err.message}</small></p>`;
-  }
+  const job = jobs.find(j => j.id === jobId);
+  const match = matchResults.find(m => m.job_id === jobId);
+
+  if (!job) return;
+
+  details.innerHTML = `
+    <h2>${job.title}</h2>
+    <p><strong>${job.company}</strong> • ${job.location || "Location not listed"}</p>
+
+    <div style="margin:10px 0;">
+      <span class="tag">${job.salary_range || "Salary not listed"}</span>
+      <span class="tag" style="background:#3a86ff;color:white;">
+        ${match ? match.match_score : 0}% Match
+      </span>
+    </div>
+
+    <hr style="margin:15px 0;">
+
+    <h3>AI Explanation</h3>
+    <p>${match ? match.explanation : "No match data available."}</p>
+
+    <h3>Matched Skills</h3>
+    <p>${match && match.matched_skills.length ? match.matched_skills.join(", ") : "None"}</p>
+
+    <h3>Missing Skills</h3>
+    <p>${match && match.missing_skills.length ? match.missing_skills.join(", ") : "None"}</p>
+
+    <h3>Job Requirements</h3>
+    <ul>
+      ${(job.skills_required || []).map(s => `<li>${s}</li>`).join("")}
+    </ul>
+
+    <button class="primary" style="width:100%;margin-top:15px;"
+      onclick='saveJob(${JSON.stringify(job)})'>
+      Save Job
+    </button>
+  `;
+
+  modal.classList.remove("hidden");
 }
 
-function saveJob(id) {
-  let saved = JSON.parse(localStorage.getItem("savedJobs")) || [];
-  const normalizedId = String(id);
+document.getElementById("closeModal").addEventListener("click", () => {
+  document.getElementById("jobModal").classList.add("hidden");
+});
 
-  if (!saved.includes(normalizedId)) {
-    saved.push(normalizedId);
-  }
+//////////////////////////////////////////////////////
+// FILTER BUTTONS
+//////////////////////////////////////////////////////
 
-  localStorage.setItem("savedJobs", JSON.stringify(saved));
-  alert("Job saved!");
+document.getElementById("filterBtn").addEventListener("click", async () => {
+  const skills = parseCommaList(document.getElementById("skillsInput").value);
+  const courses = parseCommaList(document.getElementById("courseworkInput").value);
+  const projects = parseCommaList(document.getElementById("experienceInput").value);
+
+  const profile = getUserProfile();
+  profile.skills = skills;
+  profile.courses = courses;
+  profile.projects = projects;
+
+  saveUserProfile(profile);
+
+  matchResults = await fetchMatches(skills, courses, profile.resume_text || "");
+
+  renderRecommendations();
+  displayJobs();
+});
+
+document.getElementById("clearBtn").addEventListener("click", async () => {
+  document.getElementById("skillsInput").value = "";
+  document.getElementById("courseworkInput").value = "";
+  document.getElementById("experienceInput").value = "";
+  document.getElementById("locationInput").value = "";
+
+  selectedType = null;
+  document.querySelectorAll(".bubble").forEach(b => b.classList.remove("active-bubble"));
+
+  saveUserProfile({ skills: [], courses: [], projects: [], resume_text: "" });
+
+  matchResults = await fetchMatches([], [], "");
+
+  renderRecommendations();
+  displayJobs();
+});
+
+//////////////////////////////////////////////////////
+// JOB TYPE BUBBLES
+//////////////////////////////////////////////////////
+
+document.querySelectorAll(".bubble").forEach(btn => {
+  btn.addEventListener("click", () => {
+    selectedType = btn.dataset.type;
+
+    document.querySelectorAll(".bubble").forEach(b => b.classList.remove("active-bubble"));
+    btn.classList.add("active-bubble");
+
+    displayJobs();
+  });
+});
+
+//////////////////////////////////////////////////////
+// SEARCH + SORT
+//////////////////////////////////////////////////////
+
+document.getElementById("searchBar").addEventListener("input", (e) => {
+  currentSearch = e.target.value;
+  displayJobs();
+});
+
+document.getElementById("sortSelect").addEventListener("change", (e) => {
+  currentSort = e.target.value;
+  displayJobs();
+});
+
+//////////////////////////////////////////////////////
+// INIT
+//////////////////////////////////////////////////////
+
+async function init() {
+  updateSavedCount();
+  await fetchJobs();
+
+  const profile = getUserProfile();
+  matchResults = await fetchMatches(profile.skills, profile.courses, profile.resume_text || "");
+
+  renderRecommendations();
+  displayJobs();
 }
 
-async function loadSavedJobs() {
-  const container = document.getElementById("savedJobs");
-  if (!container) return;
-
-  const saved = JSON.parse(localStorage.getItem("savedJobs")) || [];
-
-  try {
-    const jobs = await getJobs();
-    const selected = saved
-      .map((id) => jobs.find((job) => String(job.id ?? job.job_id) === String(id)))
-      .filter(Boolean);
-
-    renderJobs(container, selected, "You have no saved jobs yet.");
-  } catch (err) {
-    console.error("[UI] loadSavedJobs failed", { error: err.message });
-    container.innerHTML = `<p>We couldn't load saved jobs because the backend is unavailable.</p><p><small>${err.message}</small></p>`;
-  }
-}
-
-async function loadJobDetails() {
-  const params = new URLSearchParams(window.location.search);
-  const id = params.get("id");
-  const container = document.getElementById("jobDetails");
-
-  if (!id || !container) return;
-
-  try {
-    const jobs = await getJobs();
-    const job = jobs.find((j) => String(j.id ?? j.job_id) === String(id));
-
-    if (!job) {
-      container.innerHTML = "<p>Job not found.</p>";
-      return;
-    }
-
-    const jobId = job.id ?? job.job_id;
-
-    container.innerHTML = `
-<h2>${job.title || "Untitled role"}</h2>
-<h3>${job.company || job.company_name || "Unknown company"}</h3>
-<p><b>Location:</b> ${job.location || "Location not listed"}</p>
-
-<h4>Description</h4>
-<p>${job.description || "No description provided."}</p>
-
-<h4>Requirements</h4>
-<p>${job.requirements || job.skills_desc || "No requirements listed."}</p>
-
-<button onclick="saveJob('${jobId}')" class="btn btn-primary">
-Save Job
-</button>
-`;
-  } catch (err) {
-    console.error("[UI] loadJobDetails failed", { error: err.message });
-    container.innerHTML = `<p>We couldn't load this job because the backend is unavailable.</p><p><small>${err.message}</small></p>`;
-  }
-}
-
-loadSavedJobs();
-loadJobDetails();
+init();
