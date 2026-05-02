@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JobFinder - Compare</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="nav-left">
+    <h1 class="logo">JobFinder</h1>
+    <span class="tagline">Compare Jobs Side-by-Side</span>
+  </div>
+
+  <div class="nav-right">
+    <a href="index.html"><button class="nav-btn">Jobs</button></a>
+    <a href="compare.html"><button class="nav-btn">Compare</button></a>
+    <a href="tracker.html"><button class="nav-btn">Tracker</button></a>
+    <a href="profile.html"><button class="nav-btn">Profile</button></a>
+  </div>
+</nav>
+
+<div class="compare-page">
+
+  <div class="compare-header">
+    <div>
+      <h2>Compare Jobs</h2>
+      <p>Compare roles side-by-side to decide what fits best.</p>
+    </div>
+
+    <button class="danger-btn small-danger" id="clearCompareBtn">
+      Clear All
+    </button>
+  </div>
+
+  <div id="compareGrid" class="compare-grid"></div>
+
+</div>
+
+<script src="compare.js"></script>
+</body>
+</html>

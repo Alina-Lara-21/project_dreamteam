@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JobFinder - Tracker</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="nav-left">
+    <h1 class="logo">JobFinder</h1>
+    <span class="tagline">Application Tracker</span>
+  </div>
+
+  <div class="nav-right">
+    <a href="index.html"><button class="nav-btn">Jobs</button></a>
+    <a href="compare.html"><button class="nav-btn">Compare</button></a>
+    <a href="tracker.html"><button class="nav-btn">Tracker</button></a>
+    <a href="profile.html"><button class="nav-btn">Profile</button></a>
+  </div>
+</nav>
+
+<div class="page-container">
+
+  <div class="page-header">
+    <h2>Application Tracker</h2>
+    <p>Drag saved jobs between columns to track your progress</p>
+  </div>
+
+  <div class="tracker-columns">
+
+    <div class="column" data-status="applied">
+      <h3>Applied</h3>
+      <div class="drop-zone" id="appliedZone"></div>
+    </div>
+
+    <div class="column" data-status="interview">
+      <h3>Interview</h3>
+      <div class="drop-zone" id="interviewZone"></div>
+    </div>
+
+    <div class="column" data-status="offer">
+      <h3>Offer</h3>
+      <div class="drop-zone" id="offerZone"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- MODAL -->
+<div id="trackerModal" class="modal hidden">
+  <div class="modal-content">
+    <span class="close" id="closeTrackerModal">&times;</span>
+    <div id="trackerJobDetails"></div>
+  </div>
+</div>
+
+<script src="tracker.js"></script>
+</body>
+</html>
