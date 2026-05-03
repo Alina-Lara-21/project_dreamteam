@@ -1,8 +1,18 @@
+from app_db.database import Base, engine
+
+import app_db.models  # noqa: F401 — registers ORM tables on Base.metadata for create_all
+
+from routers.progress_session import router as progress_router
+from routers.user_saved_jobs import router as saved_jobs_router
+from routers.user_progress_state import router as progress_state_router
+
 import json
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from models import (
     Job,
@@ -26,6 +36,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(progress_router)
+app.include_router(saved_jobs_router)
+app.include_router(progress_state_router)
+
+
+@app.on_event("startup")
+def _create_db_tables() -> None:
+    Base.metadata.create_all(bind=engine)
 
 
 DATA_FILE = Path(__file__).with_name("data") / "jobs.json"
@@ -206,3 +225,13 @@ def skill_gap(profile: UserProfile) -> SkillGapResponse:
 @app.post("/resume/generate", response_model=ResumeGenerateResponse)
 def generate_resume(profile: UserProfile) -> ResumeGenerateResponse:
     return ResumeGenerateResponse(bullets=_build_resume_bullets(profile))
+
+
+# Serve the HTML/CSS/JS app from the project root.
+_ROOT = Path(__file__).resolve().parent
+
+@app.get("/")
+def serve_index():
+    return FileResponse(_ROOT / "index.html")
+
+app.mount("/static", StaticFiles(directory=str(_ROOT)), name="static")
