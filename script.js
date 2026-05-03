@@ -14,6 +14,10 @@ let selectedType = null;
 let currentSearch = "";
 let currentSort = "best";
 
+let skillTags = [];
+let courseTags = [];
+let expTags = [];
+
 //////////////////////////////////////////////////////
 // PROFILE STORAGE
 //////////////////////////////////////////////////////
@@ -35,16 +39,61 @@ function saveUserProfile(profile) {
 // HELPERS
 //////////////////////////////////////////////////////
 
-function parseCommaList(text) {
-  return (text || "")
-    .split(",")
-    .map(x => x.trim())
-    .filter(Boolean);
-}
-
 function updateSavedCount() {
   const saved = JSON.parse(localStorage.getItem("savedJobs")) || [];
   document.getElementById("savedJobsCount").textContent = saved.length;
+}
+
+function uniquePush(list, value) {
+  const clean = value.trim();
+  if (!clean) return;
+  if (!list.includes(clean)) list.push(clean);
+}
+
+//////////////////////////////////////////////////////
+// TAG BUBBLE SYSTEM
+//////////////////////////////////////////////////////
+
+function renderTagBubbles(containerId, list, onRemove) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = "";
+
+  list.forEach((tag, index) => {
+    const bubble = document.createElement("div");
+    bubble.className = "input-bubble";
+
+    bubble.innerHTML = `
+      ${tag}
+      <span title="Remove">&times;</span>
+    `;
+
+    bubble.querySelector("span").addEventListener("click", () => {
+      onRemove(index);
+    });
+
+    container.appendChild(bubble);
+  });
+}
+
+function setupBubbleInput(inputId, containerId, listRef) {
+  const input = document.getElementById(inputId);
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+
+      const value = input.value.replace(",", "").trim();
+      if (!value) return;
+
+      uniquePush(listRef, value);
+      input.value = "";
+
+      renderTagBubbles(containerId, listRef, (index) => {
+        listRef.splice(index, 1);
+        renderTagBubbles(containerId, listRef, arguments.callee);
+      });
+    }
+  });
 }
 
 //////////////////////////////////////////////////////
@@ -63,7 +112,7 @@ async function fetchJobs() {
 }
 
 //////////////////////////////////////////////////////
-// FETCH MATCHES (BACKEND AI MATCHER)
+// FETCH MATCHES
 //////////////////////////////////////////////////////
 
 async function fetchMatches(skills, courses, resumeText) {
@@ -148,6 +197,10 @@ function applyFilters(list) {
     filtered.sort((a, b) => (b.match_score || 0) - (a.match_score || 0));
   }
 
+  if (currentSort === "newest") {
+    filtered.sort((a, b) => new Date(b.postedDate) - new Date(a.postedDate));
+  }
+
   if (currentSort === "az") {
     filtered.sort((a, b) => a.title.localeCompare(b.title));
   }
@@ -199,7 +252,6 @@ function displayJobs() {
   const container = document.getElementById("jobList");
   container.innerHTML = "";
 
-  // Merge match results with job data
   let combined = jobs.map(job => {
     const match = matchResults.find(m => m.job_id === job.id);
 
@@ -238,7 +290,7 @@ function displayJobs() {
       </div>
 
       <div class="job-meta">
-        ${job.matched_skills.slice(0, 4).map(s => `<span class="tag">${s}</span>`).join("")}
+        ${(job.skills_required || []).slice(0, 4).map(s => `<span class="tag">${s}</span>`).join("")}
       </div>
 
       <p style="margin-top:10px;font-size:0.85rem;color:#444;">
@@ -251,15 +303,12 @@ function displayJobs() {
       </div>
     `;
 
-    const saveBtn = card.querySelector(".save-btn");
-    const compareBtn = card.querySelector(".compare-btn");
-
-    saveBtn.addEventListener("click", (e) => {
+    card.querySelector(".save-btn").addEventListener("click", (e) => {
       e.stopPropagation();
       saveJob(job);
     });
 
-    compareBtn.addEventListener("click", (e) => {
+    card.querySelector(".compare-btn").addEventListener("click", (e) => {
       e.stopPropagation();
       compareJob(job);
     });
@@ -303,15 +352,10 @@ function openJobModal(jobId) {
     <h3>Missing Skills</h3>
     <p>${match && match.missing_skills.length ? match.missing_skills.join(", ") : "None"}</p>
 
-    <h3>Job Requirements</h3>
+    <h3>Required Skills</h3>
     <ul>
       ${(job.skills_required || []).map(s => `<li>${s}</li>`).join("")}
     </ul>
-
-    <button class="primary" style="width:100%;margin-top:15px;"
-      onclick='saveJob(${JSON.stringify(job)})'>
-      Save Job
-    </button>
   `;
 
   modal.classList.remove("hidden");
@@ -326,27 +370,29 @@ document.getElementById("closeModal").addEventListener("click", () => {
 //////////////////////////////////////////////////////
 
 document.getElementById("filterBtn").addEventListener("click", async () => {
-  const skills = parseCommaList(document.getElementById("skillsInput").value);
-  const courses = parseCommaList(document.getElementById("courseworkInput").value);
-  const projects = parseCommaList(document.getElementById("experienceInput").value);
-
   const profile = getUserProfile();
-  profile.skills = skills;
-  profile.courses = courses;
-  profile.projects = projects;
+
+  profile.skills = skillTags;
+  profile.courses = courseTags;
+  profile.projects = expTags;
 
   saveUserProfile(profile);
 
-  matchResults = await fetchMatches(skills, courses, profile.resume_text || "");
+  matchResults = await fetchMatches(profile.skills, profile.courses, profile.resume_text || "");
 
   renderRecommendations();
   displayJobs();
 });
 
 document.getElementById("clearBtn").addEventListener("click", async () => {
-  document.getElementById("skillsInput").value = "";
-  document.getElementById("courseworkInput").value = "";
-  document.getElementById("experienceInput").value = "";
+  skillTags = [];
+  courseTags = [];
+  expTags = [];
+
+  renderTagBubbles("skillsBubbles", skillTags, () => {});
+  renderTagBubbles("courseworkBubbles", courseTags, () => {});
+  renderTagBubbles("experienceBubbles", expTags, () => {});
+
   document.getElementById("locationInput").value = "";
 
   selectedType = null;
@@ -395,9 +441,35 @@ document.getElementById("sortSelect").addEventListener("change", (e) => {
 
 async function init() {
   updateSavedCount();
+
+  setupBubbleInput("skillsInput", "skillsBubbles", skillTags);
+  setupBubbleInput("courseworkInput", "courseworkBubbles", courseTags);
+  setupBubbleInput("experienceInput", "experienceBubbles", expTags);
+
   await fetchJobs();
 
   const profile = getUserProfile();
+
+  // load saved tags into bubbles
+  skillTags = profile.skills || [];
+  courseTags = profile.courses || [];
+  expTags = profile.projects || [];
+
+  renderTagBubbles("skillsBubbles", skillTags, (i) => {
+    skillTags.splice(i, 1);
+    renderTagBubbles("skillsBubbles", skillTags, arguments.callee);
+  });
+
+  renderTagBubbles("courseworkBubbles", courseTags, (i) => {
+    courseTags.splice(i, 1);
+    renderTagBubbles("courseworkBubbles", courseTags, arguments.callee);
+  });
+
+  renderTagBubbles("experienceBubbles", expTags, (i) => {
+    expTags.splice(i, 1);
+    renderTagBubbles("experienceBubbles", expTags, arguments.callee);
+  });
+
   matchResults = await fetchMatches(profile.skills, profile.courses, profile.resume_text || "");
 
   renderRecommendations();

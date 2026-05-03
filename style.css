@@ -1083,3 +1083,38 @@ button.secondary:hover {
     flex-direction: column;
   }
 }
+
+/* ==============================
+   INPUT BUBBLES (SKILLS/COURSES)
+============================== */
+
+.input-bubbles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.input-bubble {
+  background: #edf2fb;
+  border: 1px solid #dce3ee;
+  padding: 6px 10px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #0d1b2a;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.input-bubble span {
+  cursor: pointer;
+  font-weight: 900;
+  color: #e63946;
+  transition: 0.2s;
+}
+
+.input-bubble span:hover {
+  transform: scale(1.2);
+}
