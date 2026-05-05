@@ -44,21 +44,15 @@ function updateSavedCount() {
   document.getElementById("savedJobsCount").textContent = saved.length;
 }
 
-function uniquePush(list, value) {
-  const clean = value.trim();
-  if (!clean) return;
-  if (!list.includes(clean)) list.push(clean);
-}
-
 //////////////////////////////////////////////////////
-// TAG BUBBLE SYSTEM
+// TAG BUBBLE SYSTEM (COMMA SUPPORT)
 //////////////////////////////////////////////////////
 
-function renderTagBubbles(containerId, list, onRemove) {
+function renderTagBubbles(containerId, listRef) {
   const container = document.getElementById(containerId);
   container.innerHTML = "";
 
-  list.forEach((tag, index) => {
+  listRef.forEach((tag, index) => {
     const bubble = document.createElement("div");
     bubble.className = "input-bubble";
 
@@ -68,7 +62,8 @@ function renderTagBubbles(containerId, list, onRemove) {
     `;
 
     bubble.querySelector("span").addEventListener("click", () => {
-      onRemove(index);
+      listRef.splice(index, 1);
+      renderTagBubbles(containerId, listRef);
     });
 
     container.appendChild(bubble);
@@ -78,20 +73,40 @@ function renderTagBubbles(containerId, list, onRemove) {
 function setupBubbleInput(inputId, containerId, listRef) {
   const input = document.getElementById(inputId);
 
+  input.addEventListener("input", () => {
+    if (input.value.includes(",")) {
+      const parts = input.value.split(",");
+
+      parts.slice(0, -1).forEach(part => {
+        const value = part.trim();
+        if (value && !listRef.includes(value)) {
+          listRef.push(value);
+        }
+      });
+
+      input.value = parts[parts.length - 1].trim();
+      renderTagBubbles(containerId, listRef);
+    }
+  });
+
   input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" || e.key === ",") {
+    if (e.key === "Enter") {
       e.preventDefault();
 
-      const value = input.value.replace(",", "").trim();
+      const value = input.value.trim();
       if (!value) return;
 
-      uniquePush(listRef, value);
-      input.value = "";
+      if (!listRef.includes(value)) {
+        listRef.push(value);
+      }
 
-      renderTagBubbles(containerId, listRef, (index) => {
-        listRef.splice(index, 1);
-        renderTagBubbles(containerId, listRef, arguments.callee);
-      });
+      input.value = "";
+      renderTagBubbles(containerId, listRef);
+    }
+
+    if (e.key === "Backspace" && input.value.trim() === "" && listRef.length > 0) {
+      listRef.pop();
+      renderTagBubbles(containerId, listRef);
     }
   });
 }
@@ -318,7 +333,7 @@ function displayJobs() {
 }
 
 //////////////////////////////////////////////////////
-// JOB MODAL
+// JOB MODAL (UPDATED: WHY THIS JOB + APPLY LINK)
 //////////////////////////////////////////////////////
 
 function openJobModal(jobId) {
@@ -330,6 +345,19 @@ function openJobModal(jobId) {
 
   if (!job) return;
 
+  const matchScore = match ? match.match_score : 0;
+  const matchedSkills = match ? match.matched_skills : [];
+  const missingSkills = match ? match.missing_skills : [];
+  const explanation = match ? match.explanation : "No match data available.";
+
+  // Breakdown estimate (visual only)
+  const skillScore = Math.min(70, matchScore);
+  const courseScore = Math.min(20, Math.max(0, matchScore - 50));
+  const resumeScore = Math.min(10, Math.max(0, matchScore - 80));
+
+  // TEMP APPLY LINK (for now)
+  const applyLink = job.apply_link || "https://example.com/apply";
+
   details.innerHTML = `
     <h2>${job.title}</h2>
     <p><strong>${job.company}</strong> • ${job.location || "Location not listed"}</p>
@@ -337,25 +365,44 @@ function openJobModal(jobId) {
     <div style="margin:10px 0;">
       <span class="tag">${job.salary_range || "Salary not listed"}</span>
       <span class="tag" style="background:#3a86ff;color:white;">
-        ${match ? match.match_score : 0}% Match
+        ${matchScore}% Match
       </span>
     </div>
 
-    <hr style="margin:15px 0;">
+    <div class="why-card">
+      <h4>Why This Job?</h4>
+      <p>${explanation}</p>
 
-    <h3>AI Explanation</h3>
-    <p>${match ? match.explanation : "No match data available."}</p>
+      <div class="breakdown-grid">
+        <div class="breakdown-box">
+          <h5>Skills Match</h5>
+          <span>${skillScore}%</span>
+        </div>
+        <div class="breakdown-box">
+          <h5>Coursework Match</h5>
+          <span>${courseScore}%</span>
+        </div>
+        <div class="breakdown-box">
+          <h5>Resume Keywords</h5>
+          <span>${resumeScore}%</span>
+        </div>
+      </div>
+    </div>
 
     <h3>Matched Skills</h3>
-    <p>${match && match.matched_skills.length ? match.matched_skills.join(", ") : "None"}</p>
+    <p>${matchedSkills.length ? matchedSkills.join(", ") : "None"}</p>
 
     <h3>Missing Skills</h3>
-    <p>${match && match.missing_skills.length ? match.missing_skills.join(", ") : "None"}</p>
+    <p>${missingSkills.length ? missingSkills.join(", ") : "None"}</p>
 
     <h3>Required Skills</h3>
     <ul>
       ${(job.skills_required || []).map(s => `<li>${s}</li>`).join("")}
     </ul>
+
+    <a class="apply-btn" href="${applyLink}" target="_blank">
+      Apply Now
+    </a>
   `;
 
   modal.classList.remove("hidden");
@@ -389,9 +436,9 @@ document.getElementById("clearBtn").addEventListener("click", async () => {
   courseTags = [];
   expTags = [];
 
-  renderTagBubbles("skillsBubbles", skillTags, () => {});
-  renderTagBubbles("courseworkBubbles", courseTags, () => {});
-  renderTagBubbles("experienceBubbles", expTags, () => {});
+  renderTagBubbles("skillsBubbles", skillTags);
+  renderTagBubbles("courseworkBubbles", courseTags);
+  renderTagBubbles("experienceBubbles", expTags);
 
   document.getElementById("locationInput").value = "";
 
@@ -450,25 +497,13 @@ async function init() {
 
   const profile = getUserProfile();
 
-  // load saved tags into bubbles
   skillTags = profile.skills || [];
   courseTags = profile.courses || [];
   expTags = profile.projects || [];
 
-  renderTagBubbles("skillsBubbles", skillTags, (i) => {
-    skillTags.splice(i, 1);
-    renderTagBubbles("skillsBubbles", skillTags, arguments.callee);
-  });
-
-  renderTagBubbles("courseworkBubbles", courseTags, (i) => {
-    courseTags.splice(i, 1);
-    renderTagBubbles("courseworkBubbles", courseTags, arguments.callee);
-  });
-
-  renderTagBubbles("experienceBubbles", expTags, (i) => {
-    expTags.splice(i, 1);
-    renderTagBubbles("experienceBubbles", expTags, arguments.callee);
-  });
+  renderTagBubbles("skillsBubbles", skillTags);
+  renderTagBubbles("courseworkBubbles", courseTags);
+  renderTagBubbles("experienceBubbles", expTags);
 
   matchResults = await fetchMatches(profile.skills, profile.courses, profile.resume_text || "");
 
