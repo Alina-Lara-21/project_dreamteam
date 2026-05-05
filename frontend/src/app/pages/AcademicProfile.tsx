@@ -2,6 +2,7 @@ import { useState } from "react";
 import { GraduationCap, Plus, X, Upload, CheckCircle2, Code, FileText, Briefcase, Github, Linkedin, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router";
+import { apiUrl } from "../../apiBase";
 
 export function AcademicProfile() {
   const navigate = useNavigate();
@@ -127,7 +128,7 @@ export function AcademicProfile() {
     toast.success("Analyzing your profile with AI...");
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/match", {
+      const response = await fetch(apiUrl("/match"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

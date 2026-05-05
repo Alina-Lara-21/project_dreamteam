@@ -13,7 +13,7 @@ Software Engineering Course: Final Project
    python3 -m uvicorn main:app --reload
    ```
 
-The frontend `script.js` reads data from FastAPI at `http://127.0.0.1:8000` by default.
+The root HTML app's `script.js` calls the API on the same origin (`window.location.origin`). To point at a different backend, set `window.__API_BASE__` before loading scripts. The Vite app in `frontend/` uses `VITE_API_URL` when set (see `frontend/src/apiBase.ts`).
 
 ## API endpoints
 

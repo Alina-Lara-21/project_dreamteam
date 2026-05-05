@@ -1,6 +1,7 @@
 import { JobCard } from "./JobCard";
 import { useLocation } from "react-router";
 import { useEffect, useState } from "react";
+import { apiUrl } from "../../apiBase";
 
 interface JobListingsProps {
   filters?: any;
@@ -74,7 +75,7 @@ export function JobListings({ filters }: JobListingsProps = {}) {
       setIsLoading(true);
       setError("");
       try {
-        const response = await fetch("http://127.0.0.1:8000/jobs");
+        const response = await fetch(apiUrl("/jobs"));
         if (!response.ok) {
           throw new Error("Failed to fetch jobs");
         }

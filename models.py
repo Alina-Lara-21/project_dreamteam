@@ -11,12 +11,16 @@ class UserProfile(BaseModel):
 
 
 class Job(BaseModel):
+    """API job shape consumed by vanilla JS (`skills_required`, etc.). Maps from Mongo via services.jobs_mongo."""
+
     id: int
     title: str
     company: str
     skills_required: list[str] = Field(default_factory=list)
     salary_range: Optional[str] = None
     location: Optional[str] = None
+    description: Optional[str] = None
+    requirements: Optional[str] = None
 
 
 class MatchResult(BaseModel):
