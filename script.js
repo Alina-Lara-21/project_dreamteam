@@ -1,10 +1,8 @@
 //////////////////////////////////////////////////////
-// BACKEND URL (same origin on Render; override if API is hosted separately)
+// BACKEND URL
 //////////////////////////////////////////////////////
 
-const API_BASE =
-  (typeof window.__API_BASE__ === "string" && window.__API_BASE__.trim()) ||
-  window.location.origin;
+const API_BASE = "http://127.0.0.1:8000";
 
 //////////////////////////////////////////////////////
 // STATE
@@ -15,6 +13,10 @@ let matchResults = [];
 let selectedType = null;
 let currentSearch = "";
 let currentSort = "best";
+
+let skillTags = [];
+let courseTags = [];
+let expTags = [];
 
 //////////////////////////////////////////////////////
 // PROFILE STORAGE
@@ -37,16 +39,76 @@ function saveUserProfile(profile) {
 // HELPERS
 //////////////////////////////////////////////////////
 
-function parseCommaList(text) {
-  return (text || "")
-    .split(",")
-    .map(x => x.trim())
-    .filter(Boolean);
-}
-
 function updateSavedCount() {
   const saved = JSON.parse(localStorage.getItem("savedJobs")) || [];
   document.getElementById("savedJobsCount").textContent = saved.length;
+}
+
+//////////////////////////////////////////////////////
+// TAG BUBBLE SYSTEM (COMMA SUPPORT)
+//////////////////////////////////////////////////////
+
+function renderTagBubbles(containerId, listRef) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = "";
+
+  listRef.forEach((tag, index) => {
+    const bubble = document.createElement("div");
+    bubble.className = "input-bubble";
+
+    bubble.innerHTML = `
+      ${tag}
+      <span title="Remove">&times;</span>
+    `;
+
+    bubble.querySelector("span").addEventListener("click", () => {
+      listRef.splice(index, 1);
+      renderTagBubbles(containerId, listRef);
+    });
+
+    container.appendChild(bubble);
+  });
+}
+
+function setupBubbleInput(inputId, containerId, listRef) {
+  const input = document.getElementById(inputId);
+
+  input.addEventListener("input", () => {
+    if (input.value.includes(",")) {
+      const parts = input.value.split(",");
+
+      parts.slice(0, -1).forEach(part => {
+        const value = part.trim();
+        if (value && !listRef.includes(value)) {
+          listRef.push(value);
+        }
+      });
+
+      input.value = parts[parts.length - 1].trim();
+      renderTagBubbles(containerId, listRef);
+    }
+  });
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+
+      const value = input.value.trim();
+      if (!value) return;
+
+      if (!listRef.includes(value)) {
+        listRef.push(value);
+      }
+
+      input.value = "";
+      renderTagBubbles(containerId, listRef);
+    }
+
+    if (e.key === "Backspace" && input.value.trim() === "" && listRef.length > 0) {
+      listRef.pop();
+      renderTagBubbles(containerId, listRef);
+    }
+  });
 }
 
 //////////////////////////////////////////////////////
@@ -65,12 +127,12 @@ async function fetchJobs() {
 }
 
 //////////////////////////////////////////////////////
-// FETCH MATCHES (BACKEND AI MATCHER)
+// FETCH MATCHES
 //////////////////////////////////////////////////////
 
 async function fetchMatches(skills, courses, resumeText) {
   try {
-    const response = await fetch(`${API_BASE}/match`, {
+    const response = await fetch("http://127.0.0.1:8000/match", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -150,6 +212,10 @@ function applyFilters(list) {
     filtered.sort((a, b) => (b.match_score || 0) - (a.match_score || 0));
   }
 
+  if (currentSort === "newest") {
+    filtered.sort((a, b) => new Date(b.postedDate) - new Date(a.postedDate));
+  }
+
   if (currentSort === "az") {
     filtered.sort((a, b) => a.title.localeCompare(b.title));
   }
@@ -201,14 +267,6 @@ function displayJobs() {
   const container = document.getElementById("jobList");
   container.innerHTML = "";
 
-  if (!jobs.length) {
-    container.innerHTML =
-      '<p class="empty-state-msg">No jobs are available yet. If you use MongoDB, confirm data import and DB_NAME / collection settings.</p>';
-    document.getElementById("resultsCount").textContent = "0 results";
-    return;
-  }
-
-  // Merge match results with job data
   let combined = jobs.map(job => {
     const match = matchResults.find(m => m.job_id === job.id);
 
@@ -247,7 +305,7 @@ function displayJobs() {
       </div>
 
       <div class="job-meta">
-        ${job.matched_skills.slice(0, 4).map(s => `<span class="tag">${s}</span>`).join("")}
+        ${(job.skills_required || []).slice(0, 4).map(s => `<span class="tag">${s}</span>`).join("")}
       </div>
 
       <p style="margin-top:10px;font-size:0.85rem;color:#444;">
@@ -260,15 +318,12 @@ function displayJobs() {
       </div>
     `;
 
-    const saveBtn = card.querySelector(".save-btn");
-    const compareBtn = card.querySelector(".compare-btn");
-
-    saveBtn.addEventListener("click", (e) => {
+    card.querySelector(".save-btn").addEventListener("click", (e) => {
       e.stopPropagation();
       saveJob(job);
     });
 
-    compareBtn.addEventListener("click", (e) => {
+    card.querySelector(".compare-btn").addEventListener("click", (e) => {
       e.stopPropagation();
       compareJob(job);
     });
@@ -278,7 +333,7 @@ function displayJobs() {
 }
 
 //////////////////////////////////////////////////////
-// JOB MODAL
+// JOB MODAL (UPDATED: WHY THIS JOB + APPLY LINK)
 //////////////////////////////////////////////////////
 
 function openJobModal(jobId) {
@@ -290,6 +345,19 @@ function openJobModal(jobId) {
 
   if (!job) return;
 
+  const matchScore = match ? match.match_score : 0;
+  const matchedSkills = match ? match.matched_skills : [];
+  const missingSkills = match ? match.missing_skills : [];
+  const explanation = match ? match.explanation : "No match data available.";
+
+  // Breakdown estimate (visual only)
+  const skillScore = Math.min(70, matchScore);
+  const courseScore = Math.min(20, Math.max(0, matchScore - 50));
+  const resumeScore = Math.min(10, Math.max(0, matchScore - 80));
+
+  // TEMP APPLY LINK (for now)
+  const applyLink = job.apply_link || "https://example.com/apply";
+
   details.innerHTML = `
     <h2>${job.title}</h2>
     <p><strong>${job.company}</strong> • ${job.location || "Location not listed"}</p>
@@ -297,30 +365,44 @@ function openJobModal(jobId) {
     <div style="margin:10px 0;">
       <span class="tag">${job.salary_range || "Salary not listed"}</span>
       <span class="tag" style="background:#3a86ff;color:white;">
-        ${match ? match.match_score : 0}% Match
+        ${matchScore}% Match
       </span>
     </div>
 
-    <hr style="margin:15px 0;">
+    <div class="why-card">
+      <h4>Why This Job?</h4>
+      <p>${explanation}</p>
 
-    <h3>AI Explanation</h3>
-    <p>${match ? match.explanation : "No match data available."}</p>
+      <div class="breakdown-grid">
+        <div class="breakdown-box">
+          <h5>Skills Match</h5>
+          <span>${skillScore}%</span>
+        </div>
+        <div class="breakdown-box">
+          <h5>Coursework Match</h5>
+          <span>${courseScore}%</span>
+        </div>
+        <div class="breakdown-box">
+          <h5>Resume Keywords</h5>
+          <span>${resumeScore}%</span>
+        </div>
+      </div>
+    </div>
 
     <h3>Matched Skills</h3>
-    <p>${match && match.matched_skills.length ? match.matched_skills.join(", ") : "None"}</p>
+    <p>${matchedSkills.length ? matchedSkills.join(", ") : "None"}</p>
 
     <h3>Missing Skills</h3>
-    <p>${match && match.missing_skills.length ? match.missing_skills.join(", ") : "None"}</p>
+    <p>${missingSkills.length ? missingSkills.join(", ") : "None"}</p>
 
-    <h3>Job Requirements</h3>
+    <h3>Required Skills</h3>
     <ul>
       ${(job.skills_required || []).map(s => `<li>${s}</li>`).join("")}
     </ul>
 
-    <button class="primary" style="width:100%;margin-top:15px;"
-      onclick='saveJob(${JSON.stringify(job)})'>
-      Save Job
-    </button>
+    <a class="apply-btn" href="${applyLink}" target="_blank">
+      Apply Now
+    </a>
   `;
 
   modal.classList.remove("hidden");
@@ -335,27 +417,29 @@ document.getElementById("closeModal").addEventListener("click", () => {
 //////////////////////////////////////////////////////
 
 document.getElementById("filterBtn").addEventListener("click", async () => {
-  const skills = parseCommaList(document.getElementById("skillsInput").value);
-  const courses = parseCommaList(document.getElementById("courseworkInput").value);
-  const projects = parseCommaList(document.getElementById("experienceInput").value);
-
   const profile = getUserProfile();
-  profile.skills = skills;
-  profile.courses = courses;
-  profile.projects = projects;
+
+  profile.skills = skillTags;
+  profile.courses = courseTags;
+  profile.projects = expTags;
 
   saveUserProfile(profile);
 
-  matchResults = await fetchMatches(skills, courses, profile.resume_text || "");
+  matchResults = await fetchMatches(profile.skills, profile.courses, profile.resume_text || "");
 
   renderRecommendations();
   displayJobs();
 });
 
 document.getElementById("clearBtn").addEventListener("click", async () => {
-  document.getElementById("skillsInput").value = "";
-  document.getElementById("courseworkInput").value = "";
-  document.getElementById("experienceInput").value = "";
+  skillTags = [];
+  courseTags = [];
+  expTags = [];
+
+  renderTagBubbles("skillsBubbles", skillTags);
+  renderTagBubbles("courseworkBubbles", courseTags);
+  renderTagBubbles("experienceBubbles", expTags);
+
   document.getElementById("locationInput").value = "";
 
   selectedType = null;
@@ -404,9 +488,23 @@ document.getElementById("sortSelect").addEventListener("change", (e) => {
 
 async function init() {
   updateSavedCount();
+
+  setupBubbleInput("skillsInput", "skillsBubbles", skillTags);
+  setupBubbleInput("courseworkInput", "courseworkBubbles", courseTags);
+  setupBubbleInput("experienceInput", "experienceBubbles", expTags);
+
   await fetchJobs();
 
   const profile = getUserProfile();
+
+  skillTags = profile.skills || [];
+  courseTags = profile.courses || [];
+  expTags = profile.projects || [];
+
+  renderTagBubbles("skillsBubbles", skillTags);
+  renderTagBubbles("courseworkBubbles", courseTags);
+  renderTagBubbles("experienceBubbles", expTags);
+
   matchResults = await fetchMatches(profile.skills, profile.courses, profile.resume_text || "");
 
   renderRecommendations();
