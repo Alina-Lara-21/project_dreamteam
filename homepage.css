@@ -39,6 +39,12 @@ color:white;
 cursor:pointer;
 }
 
+a.nav-btn,
+a.cta-btn{
+text-decoration:none;
+display:inline-block;
+}
+
 /* Hero section */
 
 .hero{

@@ -12,9 +12,9 @@
 <img src="/static/images/logo.png">
 
 <nav>
-<a href="index.html">Home</a>
-<a href="search.html">Smart Search</a>
-<a href="saved.html">Saved Jobs</a>
+<a href="/">Home</a>
+<a href="/search">Smart Search</a>
+<a href="/saved">Saved Jobs</a>
 </nav>
 </header>
 
@@ -27,7 +27,7 @@
 </div>
 
 <script>
-    window.JOB_API_BASE_URL = "http://127.0.0.1:8000";
+    window.JOB_API_BASE_URL = window.location.origin;
   </script>
   <script src="/static/script.js"></script>
   

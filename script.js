@@ -1,8 +1,10 @@
 //////////////////////////////////////////////////////
-// BACKEND URL
+// BACKEND URL (same origin on Render; override if API is hosted separately)
 //////////////////////////////////////////////////////
 
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE =
+  (typeof window.__API_BASE__ === "string" && window.__API_BASE__.trim()) ||
+  window.location.origin;
 
 //////////////////////////////////////////////////////
 // STATE
@@ -68,7 +70,7 @@ async function fetchJobs() {
 
 async function fetchMatches(skills, courses, resumeText) {
   try {
-    const response = await fetch("http://127.0.0.1:8000/match", {
+    const response = await fetch(`${API_BASE}/match`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -198,6 +200,13 @@ function renderRecommendations() {
 function displayJobs() {
   const container = document.getElementById("jobList");
   container.innerHTML = "";
+
+  if (!jobs.length) {
+    container.innerHTML =
+      '<p class="empty-state-msg">No jobs are available yet. If you use MongoDB, confirm data import and DB_NAME / collection settings.</p>';
+    document.getElementById("resultsCount").textContent = "0 results";
+    return;
+  }
 
   // Merge match results with job data
   let combined = jobs.map(job => {

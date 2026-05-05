@@ -4,6 +4,7 @@ import { JobCard } from "../components/JobCard";
 import { ResumeGenerator } from "../components/ResumeGenerator";
 import { toast } from "sonner";
 import { useNavigate } from "react-router";
+import { apiUrl } from "../../apiBase";
 
 const matchedJobs = [
   {
@@ -87,7 +88,7 @@ export function SmartSearch() {
     toast.success("Analyzing your profile...");
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/match", {
+      const response = await fetch(apiUrl("/match"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

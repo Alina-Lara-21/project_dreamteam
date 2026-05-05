@@ -48,8 +48,22 @@ body {
   transition: 0.2s;
 }
 
+a.nav-btn {
+  text-decoration: none;
+  display: inline-block;
+  text-align: center;
+}
+
 .nav-btn:hover {
   background: #2b6cd6;
+}
+
+.empty-state-msg {
+  color: #555;
+  padding: 24px;
+  background: white;
+  border-radius: 12px;
+  border: 1px dashed #cfd8e6;
 }
 
 /* LAYOUT */

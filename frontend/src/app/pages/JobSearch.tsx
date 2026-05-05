@@ -2,6 +2,7 @@ import { SearchFilters } from "../components/SearchFilters";
 import { JobCard } from "../components/JobCard";
 import { useLocation } from "react-router";
 import { useEffect, useState } from "react";
+import { apiUrl } from "../../apiBase";
 
 interface BackendMatch {
   job_id?: number;
@@ -109,14 +110,16 @@ export function JobSearch() {
         let jobsData: BackendJob[] = [];
         const initialQuery = initialFilters?.query?.trim();
         if (initialQuery) {
-          const filteredResponse = await fetch(`http://127.0.0.1:8000/jobs/filter?skills=${encodeURIComponent(initialQuery)}`);
+          const filteredResponse = await fetch(
+            `${apiUrl("/jobs/filter")}?skills=${encodeURIComponent(initialQuery)}`,
+          );
           if (!filteredResponse.ok) {
             throw new Error("Failed to fetch filtered jobs");
           }
           const filteredPayload = await filteredResponse.json();
           jobsData = Array.isArray(filteredPayload?.jobs) ? filteredPayload.jobs : [];
         } else {
-          const response = await fetch("http://127.0.0.1:8000/jobs");
+          const response = await fetch(apiUrl("/jobs"));
           if (!response.ok) {
             throw new Error("Failed to fetch jobs");
           }
@@ -192,7 +195,9 @@ export function JobSearch() {
     try {
       let sourceJobs = allBackendJobs;
       if (filters.query?.trim()) {
-        const response = await fetch(`http://127.0.0.1:8000/jobs/filter?skills=${encodeURIComponent(filters.query.trim())}`);
+        const response = await fetch(
+          `${apiUrl("/jobs/filter")}?skills=${encodeURIComponent(filters.query.trim())}`,
+        );
         if (!response.ok) {
           throw new Error("Failed to filter jobs");
         }

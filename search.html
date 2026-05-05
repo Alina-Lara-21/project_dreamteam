@@ -12,9 +12,9 @@
 <img src="/static/images/logo.png">
 
 <nav>
-<a href="index.html">Home</a>
-<a href="explore.html">Explore Jobs</a>
-<a href="saved.html">Saved Jobs</a>
+<a href="/">Home</a>
+<a href="/explore">Explore Jobs</a>
+<a href="/saved">Saved Jobs</a>
 </nav>
 </header>
 
@@ -40,8 +40,8 @@ Find Matching Jobs
 <div class="jobs-grid" id="jobResults"></div>
 
 </div>
-script>
-  window.JOB_API_BASE_URL = "http://127.0.0.1:8000";
+<script>
+  window.JOB_API_BASE_URL = window.location.origin;
 </script>
 <script src="/static/script.js"></script>
 
