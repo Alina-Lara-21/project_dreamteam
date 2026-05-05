@@ -2,7 +2,7 @@
 // BACKEND URL
 //////////////////////////////////////////////////////
 
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE = window.__API_BASE__ || window.location.origin;
 
 //////////////////////////////////////////////////////
 // STATE
@@ -132,7 +132,7 @@ async function fetchJobs() {
 
 async function fetchMatches(skills, courses, resumeText) {
   try {
-    const response = await fetch("http://127.0.0.1:8000/match", {
+    const response = await fetch(`${API_BASE}/match`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"

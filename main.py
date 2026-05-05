@@ -72,34 +72,55 @@ async def lifespan(app: FastAPI):
         app.state.jobs_backend = "json"
         app.state.mongo_client = None
         app.state.mongo_collection = None
-        logger.info("Jobs backend: JSON file (USE_JSON_JOBS is set).")
+        jobs_count = len(load_jobs_from_json())
+        logger.info(
+            "Jobs startup source=json fallback_reason=USE_JSON_JOBS total_jobs=%s data_file=%s",
+            jobs_count,
+            DATA_FILE,
+        )
     elif not uri:
         app.state.jobs_backend = "json"
         app.state.mongo_client = None
         app.state.mongo_collection = None
+        jobs_count = len(load_jobs_from_json())
         logger.warning(
-            "MONGO_URI is not set — falling back to data/jobs.json. Set MONGO_URI for MongoDB.",
+            "Jobs startup source=json fallback_reason=MONGO_URI_missing total_jobs=%s data_file=%s",
+            jobs_count,
+            DATA_FILE,
         )
     elif AsyncIOMotorClient is None:
         app.state.jobs_backend = "json"
         app.state.mongo_client = None
         app.state.mongo_collection = None
+        jobs_count = len(load_jobs_from_json())
         logger.warning(
-            "motor package not installed — falling back to data/jobs.json. Run: pip install motor",
+            "Jobs startup source=json fallback_reason=motor_missing total_jobs=%s data_file=%s",
+            jobs_count,
+            DATA_FILE,
         )
     else:
-        app.state.jobs_backend = "mongo"
         client = AsyncIOMotorClient(uri)
         app.state.mongo_client = client
         db_name = (os.environ.get("DB_NAME") or os.environ.get("JOBS_DB") or "jobs").strip()
         coll = jobs_collection(client[db_name])
-        app.state.mongo_collection = coll
 
         n = await count_jobs(coll)
-        logger.info("MongoDB jobs collection count: %s", n)
         if n == 0:
+            app.state.jobs_backend = "json"
+            app.state.mongo_collection = None
+            jobs_count = len(load_jobs_from_json())
             logger.warning(
-                "MongoDB jobs collection has 0 documents — check DB_NAME, COLLECTION_NAME, and data import.",
+                "Jobs startup source=json fallback_reason=mongo_empty total_jobs=%s mongo_db=%s",
+                jobs_count,
+                db_name,
+            )
+        else:
+            app.state.jobs_backend = "mongo"
+            app.state.mongo_collection = coll
+            logger.info(
+                "Jobs startup source=mongo total_jobs=%s mongo_db=%s",
+                n,
+                db_name,
             )
 
     yield
@@ -125,7 +146,7 @@ app.include_router(progress_state_router)
 
 
 DATA_FILE = Path(__file__).with_name("data") / "jobs.json"
-MIN_JOBS_FOR_DEMO = 50
+MIN_JOBS_FOR_DEMO = 2000
 
 
 def _expand_jobs_for_demo(jobs: list[Job], minimum_count: int = MIN_JOBS_FOR_DEMO) -> list[Job]:
