@@ -43,3 +43,4 @@ class UserProgressState(Base):
     )
     last_search_json = Column(Text, nullable=True)
     last_analysis_json = Column(Text, nullable=True)
+    profile_preferences_json = Column(Text, nullable=True)

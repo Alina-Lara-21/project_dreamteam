@@ -8,6 +8,7 @@ import os
 from typing import Any
 
 from models import Job
+from services.job_record import normalize_job_record
 from services.skill_mapper import normalize_many
 
 logger = logging.getLogger(__name__)
@@ -34,18 +35,6 @@ def stable_int_job_id(doc: dict[str, Any]) -> int:
     payload = str(oid).encode("utf-8", errors="replace")
     h = hashlib.sha256(payload).hexdigest()
     return max(1, int(h[:12], 16) % (2**31 - 1))
-
-
-def _first_str(doc: dict[str, Any], keys: tuple[str, ...]) -> str:
-    """Return first non-empty string among candidate Mongo field names."""
-    for k in keys:
-        v = doc.get(k)
-        if v is None:
-            continue
-        s = str(v).strip()
-        if s:
-            return s
-    return ""
 
 
 def _skills_list_from_doc(doc: dict[str, Any]) -> list[str]:
@@ -97,67 +86,14 @@ def _skills_list_from_doc(doc: dict[str, Any]) -> list[str]:
 
 
 def doc_to_job(doc: dict[str, Any]) -> Job:
-    """
-    Mongo document -> API Job. Adjust field names once you paste list(sample.keys()).
-    """
+    """Mongo document -> API Job via shared normalization (description, job_type fallbacks)."""
     jid = stable_int_job_id(doc)
-
-    # TODO verify canonical title field (job_title, title, Job Title, position, ...)
-    title = _first_str(
-        doc,
-        ("title", "job_title", "position", "name", "Job Title"),
-    )
-    if not title:
-        title = "(Untitled listing)"
-
-    # TODO verify canonical company field
-    company = _first_str(
-        doc,
-        ("company", "company_name", "employer_name", "CompanyName", "organization"),
-    )
-    if not company:
-        company = "(Unknown employer)"
-
-    # TODO verify canonical location fields (remote vs city/state)
-    location = _first_str(
-        doc,
-        ("location", "job_location", "city", "Location", "jobCity"),
-    )
-
-    salary_range = _first_str(
-        doc,
-        ("salary_range", "salary", "compensation", "pay_range", "annual_salary"),
-    )
-    if not salary_range:
-        salary_range = None
-
+    merged: dict[str, Any] = dict(doc)
+    merged["id"] = jid
     skills_required = _skills_list_from_doc(doc)
-
-    # Optional text fields for clients that want them; frontend may ignore
-    description = _first_str(
-        doc,
-        ("description", "job_description", "summary", "about_job", "Description"),
-    )
-    if not description:
-        description = None
-
-    requirements = _first_str(
-        doc,
-        ("requirements", "job_requirements", "qualifications", "required_qualifications"),
-    )
-    if not requirements:
-        requirements = None
-
-    return Job(
-        id=jid,
-        title=title,
-        company=company,
-        skills_required=skills_required,
-        salary_range=salary_range,
-        location=location or None,
-        description=description,
-        requirements=requirements,
-    )
+    if skills_required:
+        merged["skills_required"] = skills_required
+    return Job(**normalize_job_record(merged))
 
 
 def jobs_collection(database: Any) -> Any:

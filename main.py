@@ -3,6 +3,7 @@ from app_db.database import Base, engine
 import app_db.models  # noqa: F401 — registers ORM tables on Base.metadata for create_all
 
 from routers.progress_session import router as progress_router
+from routers.user_profile_preferences import router as profile_prefs_router
 from routers.user_saved_jobs import router as saved_jobs_router
 from routers.user_progress_state import router as progress_state_router
 
@@ -25,7 +26,7 @@ except ImportError:
         return None
 
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -36,6 +37,8 @@ except ImportError:
     AsyncIOMotorClient = None  # type: ignore[misc, assignment]
 
 from models import (
+    AiSearchRequest,
+    AiSearchResponse,
     Job,
     JobsResponse,
     MatchResponse,
@@ -44,6 +47,7 @@ from models import (
     SkillGapResponse,
     UserProfile,
 )
+from services.job_record import normalize_job_record
 from services.jobs_mongo import (
     doc_to_job,
     fetch_jobs_cap,
@@ -53,7 +57,13 @@ from services.jobs_mongo import (
     count_jobs,
 )
 from services.matcher import match_jobs
+from services.profile_preferences import load_preferences_map, merge_job_filters, merge_user_profile
 from services.skill_mapper import normalize_many
+
+from app_db.database import get_db
+from app_db.deps import DependencyOptionalProgressUser
+from app_db.sqlite_migrate import ensure_user_progress_state_columns
+from sqlalchemy.orm import Session
 
 _load_dotenv()
 
@@ -64,6 +74,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    ensure_user_progress_state_columns()
 
     uri = (os.environ.get("MONGO_URI") or "").strip()
     force_json = os.environ.get("USE_JSON_JOBS", "").lower() in ("1", "true", "yes")
@@ -117,11 +128,17 @@ async def lifespan(app: FastAPI):
         else:
             app.state.jobs_backend = "mongo"
             app.state.mongo_collection = coll
+            app.state.mongo_total_jobs = n
             logger.info(
                 "Jobs startup source=mongo total_jobs=%s mongo_db=%s",
                 n,
                 db_name,
             )
+
+    if getattr(app.state, "jobs_backend", "json") == "mongo":
+        app.state.total_jobs_available = int(getattr(app.state, "mongo_total_jobs", 0))
+    else:
+        app.state.total_jobs_available = len(load_jobs_from_json())
 
     yield
 
@@ -141,6 +158,7 @@ app.add_middleware(
 )
 
 app.include_router(progress_router)
+app.include_router(profile_prefs_router)
 app.include_router(saved_jobs_router)
 app.include_router(progress_state_router)
 
@@ -178,8 +196,7 @@ def load_jobs_from_json() -> list[Job]:
         payload = json.load(fh)
     if not isinstance(payload, list):
         return []
-    # TODO: verify keys in each job dict match models.Job / dataset export columns
-    jobs = [Job(**job) for job in payload]
+    jobs = [Job(**normalize_job_record(dict(job))) for job in payload if isinstance(job, dict)]
     return _expand_jobs_for_demo(jobs)
 
 
@@ -194,53 +211,77 @@ def get_filtered_jobs(
     skills: str | None = None,
     coursework: str | None = None,
     experience: str | None = None,
+    location: str | None = None,
+    job_types: str | None = None,
 ) -> list[Job]:
     skill_terms = set(parse_terms(skills))
     coursework_terms = set(parse_terms(coursework))
     experience_terms = set(parse_terms(experience))
 
     if not any([skill_terms, coursework_terms, experience_terms]):
-        return jobs
-
-    filtered: list[Job] = []
-    for job in jobs:
-        searchable = " ".join(
-            [
-                job.title.lower(),
-                job.company.lower(),
-                (job.location or "").lower(),
-                " ".join(normalize_many(job.skills_required)),
-            ]
-        )
-        required_skills = [skill.lower() for skill in job.skills_required]
-
-        # Demo-friendly skill matching:
-        # - OR logic: any provided skill term can match
-        # - case-insensitive
-        # - partial: "python" matches "python3"
-        if skill_terms and not any(
-            term in searchable or any(term in required_skill for required_skill in required_skills)
-            for term in skill_terms
-        ):
-            continue
-        if coursework_terms and not any(term in searchable for term in coursework_terms):
-            continue
-        if experience_terms and not any(term in searchable for term in experience_terms):
-            continue
-        filtered.append(job)
-
-    # Ensure enough results for demo while keeping deterministic ordering.
-    if len(filtered) < 10:
-        existing_ids = {job.id for job in filtered}
+        filtered = list(jobs)
+    else:
+        filtered = []
         for job in jobs:
-            if len(filtered) >= 10:
-                break
-            if job.id in existing_ids:
+            searchable = " ".join(
+                [
+                    job.title.lower(),
+                    job.company.lower(),
+                    (job.location or "").lower(),
+                    " ".join(normalize_many(job.skills_required)),
+                ]
+            )
+            required_skills = [skill.lower() for skill in job.skills_required]
+
+            # Demo-friendly skill matching:
+            # - OR logic: any provided skill term can match
+            # - case-insensitive
+            # - partial: "python" matches "python3"
+            if skill_terms and not any(
+                term in searchable or any(term in required_skill for required_skill in required_skills)
+                for term in skill_terms
+            ):
+                continue
+            if coursework_terms and not any(term in searchable for term in coursework_terms):
+                continue
+            if experience_terms and not any(term in searchable for term in experience_terms):
                 continue
             filtered.append(job)
-            existing_ids.add(job.id)
 
-    print(f"[jobs/filter] returned={len(filtered)} skills={skills!r} coursework={coursework!r} experience={experience!r}")
+        # Ensure enough results for demo while keeping deterministic ordering.
+        if len(filtered) < 10:
+            existing_ids = {job.id for job in filtered}
+            for job in jobs:
+                if len(filtered) >= 10:
+                    break
+                if job.id in existing_ids:
+                    continue
+                filtered.append(job)
+                existing_ids.add(job.id)
+
+    if location_terms := parse_terms(location):
+        loc_lower = [t.lower() for t in location_terms]
+        filtered = [
+            j
+            for j in filtered
+            if j.location and any(t in j.location.lower() for t in loc_lower)
+        ]
+
+    if job_type_terms := parse_terms(job_types):
+        jt_lower = [t.lower() for t in job_type_terms]
+        filtered = [
+            j for j in filtered if any(t in (j.job_type or "").lower() for t in jt_lower)
+        ]
+
+    logger.info(
+        "jobs/filter pipeline returned=%s skills=%r coursework=%r experience=%r location=%r job_types=%r",
+        len(filtered),
+        skills,
+        coursework,
+        experience,
+        location,
+        job_types,
+    )
     return filtered
 
 
@@ -268,21 +309,41 @@ async def load_jobs_for_list(
     skills: str | None,
     coursework: str | None,
     experience: str | None,
+    location: str | None = None,
+    job_types: str | None = None,
 ) -> list[Job]:
     filters_active = bool(
-        parse_terms(skills) or parse_terms(coursework) or parse_terms(experience)
+        parse_terms(skills)
+        or parse_terms(coursework)
+        or parse_terms(experience)
+        or parse_terms(location)
+        or parse_terms(job_types)
     )
 
     if getattr(request.app.state, "jobs_backend", "json") == "json":
         all_jobs = load_jobs_from_json()
-        filtered = get_filtered_jobs(all_jobs, skills=skills, coursework=coursework, experience=experience)
+        filtered = get_filtered_jobs(
+            all_jobs,
+            skills=skills,
+            coursework=coursework,
+            experience=experience,
+            location=location,
+            job_types=job_types,
+        )
         return filtered[skip : skip + limit]
 
     coll = request.app.state.mongo_collection
     window = _jobs_filter_window(limit, filters_active)
     docs = await fetch_jobs_raw(coll, skip=skip, limit=window)
     jobs = [doc_to_job(d) for d in docs]
-    jobs = get_filtered_jobs(jobs, skills=skills, coursework=coursework, experience=experience)
+    jobs = get_filtered_jobs(
+        jobs,
+        skills=skills,
+        coursework=coursework,
+        experience=experience,
+        location=location,
+        job_types=job_types,
+    )
     if filters_active:
         jobs = jobs[:limit]
     elif len(jobs) > limit:
@@ -319,23 +380,65 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+def _job_text_blob(job: Job) -> str:
+    return " ".join(
+        [
+            job.title,
+            job.description,
+            job.job_type,
+            job.company,
+            job.location or "",
+            " ".join(job.skills_required),
+        ]
+    ).lower()
+
+
 @app.get("/jobs", response_model=JobsResponse)
 async def get_jobs(
     request: Request,
+    learner: DependencyOptionalProgressUser,
+    db: Session = Depends(get_db),
     skills: str | None = Query(default=None, description="Comma-separated skills"),
     coursework: str | None = Query(default=None, description="Comma-separated coursework terms"),
     experience: str | None = Query(default=None, description="Comma-separated experience terms"),
-    limit: int = Query(default=50, ge=1, le=500, description="Mongo page size (after filtering)"),
-    skip: int = Query(default=0, ge=0, description="Mongo skip offset"),
+    location: str | None = Query(default=None, description="Location substring filter"),
+    job_types: str | None = Query(default=None, description="Comma-separated job type terms"),
+    limit: int = Query(default=2000, ge=1, le=5000, description="Page size after filtering"),
+    skip: int = Query(default=0, ge=0, description="Skip offset"),
+    apply_saved_profile: bool = Query(
+        default=True,
+        description="When X-Progress-Code is sent, merge saved SQLite preferences unless false",
+    ),
 ) -> JobsResponse:
-    # TODO: push skill/course/experience filtering into Mongo $match for dataset scale
+    prefs = load_preferences_map(db, learner.id) if learner else {}
+    use_saved = bool(learner and apply_saved_profile)
+    ms, mc, me, ml, mj = merge_job_filters(
+        prefs,
+        skills=skills,
+        coursework=coursework,
+        experience=experience,
+        location=location,
+        job_types=job_types,
+        apply_saved=use_saved,
+    )
     jobs = await load_jobs_for_list(
         request,
         limit=limit,
         skip=skip,
-        skills=skills,
-        coursework=coursework,
-        experience=experience,
+        skills=ms,
+        coursework=mc,
+        experience=me,
+        location=ml,
+        job_types=mj,
+    )
+    total_avail = int(getattr(request.app.state, "total_jobs_available", 0))
+    logger.info(
+        "GET /jobs source=%s returned=%s total_available=%s skip=%s limit=%s",
+        getattr(request.app.state, "jobs_backend", "?"),
+        len(jobs),
+        total_avail,
+        skip,
+        limit,
     )
     return JobsResponse(jobs=jobs)
 
@@ -343,19 +446,46 @@ async def get_jobs(
 @app.get("/jobs/filter", response_model=JobsResponse)
 async def filter_jobs(
     request: Request,
+    learner: DependencyOptionalProgressUser,
+    db: Session = Depends(get_db),
     skills: str | None = Query(default=None, description="Comma-separated skills"),
     coursework: str | None = Query(default=None, description="Comma-separated coursework terms"),
     experience: str | None = Query(default=None, description="Comma-separated experience terms"),
-    limit: int = Query(default=50, ge=1, le=500),
+    location: str | None = Query(default=None),
+    job_types: str | None = Query(default=None),
+    limit: int = Query(default=2000, ge=1, le=5000),
     skip: int = Query(default=0, ge=0),
+    apply_saved_profile: bool = Query(default=True),
 ) -> JobsResponse:
+    prefs = load_preferences_map(db, learner.id) if learner else {}
+    use_saved = bool(learner and apply_saved_profile)
+    ms, mc, me, ml, mj = merge_job_filters(
+        prefs,
+        skills=skills,
+        coursework=coursework,
+        experience=experience,
+        location=location,
+        job_types=job_types,
+        apply_saved=use_saved,
+    )
     jobs = await load_jobs_for_list(
         request,
         limit=limit,
         skip=skip,
-        skills=skills,
-        coursework=coursework,
-        experience=experience,
+        skills=ms,
+        coursework=mc,
+        experience=me,
+        location=ml,
+        job_types=mj,
+    )
+    total_avail = int(getattr(request.app.state, "total_jobs_available", 0))
+    logger.info(
+        "GET /jobs/filter source=%s returned=%s total_available=%s skip=%s limit=%s",
+        getattr(request.app.state, "jobs_backend", "?"),
+        len(jobs),
+        total_avail,
+        skip,
+        limit,
     )
     return JobsResponse(jobs=jobs)
 
@@ -375,15 +505,31 @@ async def get_job(request: Request, job_id: int) -> Job:
 
 
 @app.post("/match", response_model=MatchResponse)
-async def post_match(request: Request, profile: UserProfile) -> MatchResponse:
+async def post_match(
+    request: Request,
+    profile: UserProfile,
+    learner: DependencyOptionalProgressUser,
+    db: Session = Depends(get_db),
+    apply_saved_profile: bool = Query(default=True),
+) -> MatchResponse:
+    prefs = load_preferences_map(db, learner.id) if learner else {}
+    effective = merge_user_profile(prefs, profile) if (learner and apply_saved_profile) else profile
     jobs = await load_jobs_for_match(request)
-    return MatchResponse(matches=match_jobs(profile, jobs))
+    return MatchResponse(matches=match_jobs(effective, jobs))
 
 
 @app.post("/skill-gap", response_model=SkillGapResponse)
-async def skill_gap(request: Request, profile: UserProfile) -> SkillGapResponse:
+async def skill_gap(
+    request: Request,
+    profile: UserProfile,
+    learner: DependencyOptionalProgressUser,
+    db: Session = Depends(get_db),
+    apply_saved_profile: bool = Query(default=True),
+) -> SkillGapResponse:
+    prefs = load_preferences_map(db, learner.id) if learner else {}
+    effective = merge_user_profile(prefs, profile) if (learner and apply_saved_profile) else profile
     jobs = await load_jobs_for_match(request)
-    matches = match_jobs(profile, jobs)
+    matches = match_jobs(effective, jobs)
     return SkillGapResponse(
         results=[
             SkillGapItem(
@@ -401,6 +547,44 @@ async def skill_gap(request: Request, profile: UserProfile) -> SkillGapResponse:
 @app.post("/resume/generate", response_model=ResumeGenerateResponse)
 def generate_resume(profile: UserProfile) -> ResumeGenerateResponse:
     return ResumeGenerateResponse(bullets=_build_resume_bullets(profile))
+
+
+@app.post("/ai/search", response_model=AiSearchResponse)
+async def ai_search(
+    request: Request,
+    body: AiSearchRequest,
+    learner: DependencyOptionalProgressUser,
+    db: Session = Depends(get_db),
+    apply_saved_profile: bool = Query(default=True),
+) -> AiSearchResponse:
+    prefs = load_preferences_map(db, learner.id) if learner else {}
+    profile = UserProfile(
+        skills=body.skills,
+        courses=body.courses,
+        projects=body.projects,
+        resume_text=body.resume_text,
+    )
+    effective = merge_user_profile(prefs, profile) if (learner and apply_saved_profile) else profile
+
+    jobs_pool = await load_jobs_for_match(request)
+    q = (body.query or "").strip().lower()
+    if q:
+        text_filtered = [job for job in jobs_pool if q in _job_text_blob(job)]
+    else:
+        text_filtered = list(jobs_pool)
+
+    ranked = match_jobs(effective, text_filtered)
+    top = ranked[: body.limit]
+    by_id = {job.id: job for job in text_filtered}
+    jobs_out = [by_id[m.job_id] for m in top if m.job_id in by_id]
+    logger.info(
+        "POST /ai/search source=%s query_len=%s candidate_jobs=%s returned_jobs=%s",
+        getattr(request.app.state, "jobs_backend", "?"),
+        len(q),
+        len(text_filtered),
+        len(jobs_out),
+    )
+    return AiSearchResponse(jobs=jobs_out, matches=top)
 
 
 # Serve the HTML/CSS/JS app from the project root.

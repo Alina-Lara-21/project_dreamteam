@@ -32,3 +32,18 @@ def get_progress_user_dependency(
 
 
 DependencyProgressUser = Annotated[ProgressUser, Depends(get_progress_user_dependency)]
+
+
+def get_optional_progress_user(
+    x_progress_code: Annotated[str | None, Header(alias="X-Progress-Code")] = None,
+    db: Session = Depends(get_db),
+) -> ProgressUser | None:
+    """Same lookup as get_progress_user_dependency but returns None if header missing or unknown."""
+    code = (x_progress_code or "").strip()
+    if not code:
+        return None
+    learner = db.query(ProgressUser).filter(ProgressUser.progress_code == code).first()
+    return learner
+
+
+DependencyOptionalProgressUser = Annotated[ProgressUser | None, Depends(get_optional_progress_user)]

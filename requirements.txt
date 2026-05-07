@@ -6,3 +6,4 @@ pandas
 pymongo
 motor
 python-dotenv
+pytest

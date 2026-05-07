@@ -19,8 +19,9 @@ class Job(BaseModel):
     skills_required: list[str] = Field(default_factory=list)
     salary_range: Optional[str] = None
     location: Optional[str] = None
-    description: Optional[str] = None
+    description: str = "Description not provided."
     requirements: Optional[str] = None
+    job_type: str = "Unspecified"
 
 
 class MatchResult(BaseModel):
@@ -56,3 +57,19 @@ class ResumeGenerateResponse(BaseModel):
 
 class JobsResponse(BaseModel):
     jobs: list[Job]
+
+
+class AiSearchResponse(BaseModel):
+    jobs: list[Job]
+    matches: list[MatchResult]
+
+
+class AiSearchRequest(BaseModel):
+    """Semantic search + skill match over the loaded job catalog (no external LLM required)."""
+
+    query: str = ""
+    limit: int = Field(default=50, ge=1, le=5000)
+    skills: list[str] = Field(default_factory=list)
+    courses: list[str] = Field(default_factory=list)
+    projects: list[str] = Field(default_factory=list)
+    resume_text: Optional[str] = None

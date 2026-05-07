@@ -1,8 +1,10 @@
 """SQLite connection shared by FastAPI routers."""
+import os
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./bridge_progress.sqlite"
+SQLALCHEMY_DATABASE_URL = os.environ.get("BRIDGE_SQLITE_URL", "sqlite:///./bridge_progress.sqlite")
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,

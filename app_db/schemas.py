@@ -1,5 +1,7 @@
 """JSON bodies for progress-code endpoints (distinct from pydantic Job models.py)."""
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -35,3 +37,15 @@ class ProgressStateResponse(BaseModel):
     user_id: int
     last_search_json: str | None = None
     last_analysis_json: str | None = None
+
+
+class ProfilePreferencesResponse(BaseModel):
+    preferences: dict[str, Any] = Field(default_factory=dict)
+
+
+class ProfilePreferencesPut(BaseModel):
+    preferences: dict[str, Any]
+
+
+class ProfilePreferencesPatchBody(BaseModel):
+    preferences: dict[str, Any]
