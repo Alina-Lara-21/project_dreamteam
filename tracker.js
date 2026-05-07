@@ -1,244 +1,307 @@
-//////////////////////////////////////////////////////
-// TRACKER STORAGE
-//////////////////////////////////////////////////////
+/* =========================
+   TRACKER.JS
+========================= */
 
-function getSavedJobs() {
-  return JSON.parse(localStorage.getItem("savedJobs")) || [];
-}
+const trackerColumns = {
+  saved: document.getElementById("savedColumn"),
+  applied: document.getElementById("appliedColumn"),
+  interview: document.getElementById("interviewColumn"),
+  offer: document.getElementById("offerColumn")
+};
 
-function getTrackerBoard() {
-  return JSON.parse(localStorage.getItem("jobTrackerBoard")) || {
+let draggedJob = null;
+
+/* =========================
+   LOAD SAVED JOBS
+========================= */
+
+const savedJobs =
+  JSON.parse(localStorage.getItem("savedJobs")) || [];
+
+/* =========================
+   LOAD TRACKER STATE
+========================= */
+
+let trackerState =
+  JSON.parse(localStorage.getItem("trackerState"));
+
+if (!trackerState) {
+
+  trackerState = {
+    saved: savedJobs,
     applied: [],
     interview: [],
     offer: []
   };
+
+  saveTrackerState();
+} else {
+  syncSavedJobsToTracker();
 }
 
-function saveTrackerBoard(board) {
-  localStorage.setItem("jobTrackerBoard", JSON.stringify(board));
+/* =========================
+   SAVE STATE
+========================= */
+
+function saveTrackerState() {
+
+  localStorage.setItem(
+    "trackerState",
+    JSON.stringify(trackerState)
+  );
+
+}
+function syncSavedJobsToTracker() {
+  const savedJobs = JSON.parse(localStorage.getItem("savedJobs")) || [];
+  const trackedIds = Object.values(trackerState)
+    .flat()
+    .map(job => job.id);
+
+  const missingSaved = savedJobs.filter(
+    job => !trackedIds.includes(job.id)
+  );
+
+  if (missingSaved.length > 0) {
+    trackerState.saved = [
+      ...(trackerState.saved || []),
+      ...missingSaved
+    ];
+    saveTrackerState();
+  }
+}
+/* =========================
+   CONFETTI EFFECT
+========================= */
+
+function launchConfetti() {
+
+  for (let i = 0; i < 80; i++) {
+
+    const confetti =
+      document.createElement("div");
+
+    confetti.className = "confetti";
+
+    confetti.style.left =
+      Math.random() * window.innerWidth + "px";
+
+    confetti.style.animationDuration =
+      1.8 + Math.random() * 1.8 + "s";
+
+    confetti.style.animationDelay =
+      Math.random() * 0.25 + "s";
+
+    confetti.style.transform =
+      `rotate(${Math.random() * 360}deg)`;
+
+    const colors = [
+      "#3a86ff",
+      "#8338ec",
+      "#06d6a0",
+      "#ffb703",
+      "#ff006e"
+    ];
+
+    confetti.style.background =
+      colors[Math.floor(Math.random() * colors.length)];
+
+    confetti.style.borderRadius = "2px";
+    confetti.style.animationTimingFunction = "ease-out";
+
+    document.body.appendChild(confetti);
+
+    setTimeout(() => {
+      confetti.remove();
+    }, 5000);
+
+  }
+
 }
 
-//////////////////////////////////////////////////////
-// SYNC SAVED JOBS INTO BOARD
-//////////////////////////////////////////////////////
+/* =========================
+   REMOVE JOB
+========================= */
 
-function syncSavedJobsIntoBoard() {
-  const savedJobs = getSavedJobs();
-  const board = getTrackerBoard();
+function removeJob(id, status) {
 
-  const allBoardIds = [
-    ...board.applied,
-    ...board.interview,
-    ...board.offer
-  ];
+  const cards =
+    document.querySelectorAll(".mini-job");
 
-  // Add new saved jobs into Applied automatically
-  savedJobs.forEach(job => {
-    if (!allBoardIds.includes(job.id)) {
-      board.applied.push(job.id);
+  cards.forEach(card => {
+
+    if (card.dataset.id == id) {
+
+      card.classList.add("pop-remove");
+      card.style.transformOrigin = "center center";
+      card.animate(
+        [
+          { transform: "scale(1)", opacity: 1 },
+          { transform: "scale(0.6)", opacity: 0 }
+        ],
+        {
+          duration: 250,
+          easing: "ease",
+          fill: "forwards"
+        }
+      );
+
+      setTimeout(() => {
+        trackerState[status] =
+          trackerState[status].filter(
+            job => job.id !== id
+          );
+
+        if (status === "saved") {
+          const savedJobs = JSON.parse(
+            localStorage.getItem("savedJobs")
+          ) || [];
+
+          localStorage.setItem(
+            "savedJobs",
+            JSON.stringify(
+              savedJobs.filter(job => job.id !== id)
+            )
+          );
+        }
+
+        saveTrackerState();
+        renderTracker();
+      }, 250);
+
     }
+
   });
 
-  // Remove jobs that are no longer saved
-  const savedIds = savedJobs.map(j => j.id);
-
-  board.applied = board.applied.filter(id => savedIds.includes(id));
-  board.interview = board.interview.filter(id => savedIds.includes(id));
-  board.offer = board.offer.filter(id => savedIds.includes(id));
-
-  saveTrackerBoard(board);
 }
 
-//////////////////////////////////////////////////////
-// RENDER BOARD
-//////////////////////////////////////////////////////
+/* =========================
+   RENDER TRACKER
+========================= */
 
-function renderBoard() {
-  const savedJobs = getSavedJobs();
-  const board = getTrackerBoard();
+function renderTracker() {
 
-  document.getElementById("appliedZone").innerHTML = "";
-  document.getElementById("interviewZone").innerHTML = "";
-  document.getElementById("offerZone").innerHTML = "";
+  /* CLEAR COLUMNS */
 
-  function createCard(job, status) {
-    const card = document.createElement("div");
-    card.className = "mini-job";
-    card.draggable = true;
-    card.dataset.jobId = job.id;
-    card.dataset.status = status;
-
-    card.innerHTML = `
-      <strong>${job.title}</strong>
-      <p style="margin-top:4px;font-size:0.85rem;color:#555;">
-        ${job.company} • ${job.location || "N/A"}
-      </p>
-
-      <div class="tracker-actions">
-        <button class="details-btn">Details</button>
-        <button class="remove-btn">Remove</button>
-      </div>
-    `;
-
-    // Drag start
-    card.addEventListener("dragstart", (e) => {
-      e.dataTransfer.setData("text/plain", job.id);
-      e.dataTransfer.setData("fromStatus", status);
-      card.style.opacity = "0.5";
+  Object.values(trackerColumns)
+    .forEach(column => {
+      column.innerHTML = "";
     });
 
-    // Drag end
-    card.addEventListener("dragend", () => {
-      card.style.opacity = "1";
+  /* LOOP THROUGH EACH STATUS */
+
+  Object.keys(trackerState)
+    .forEach(status => {
+
+      trackerState[status]
+        .forEach(job => {
+
+          const card =
+            document.createElement("div");
+
+          card.className = "mini-job";
+
+          card.dataset.id = job.id;
+
+          card.draggable = true;
+
+          card.innerHTML = `
+            <strong>${job.title}</strong>
+            <p>${job.company}</p>
+
+            <div class="tracker-actions">
+              <button onclick="removeJob(${job.id}, '${status}')">
+                Remove
+              </button>
+            </div>
+          `;
+
+          /* DRAG START */
+
+          card.addEventListener("dragstart", () => {
+
+            draggedJob = {
+              job,
+              from: status
+            };
+
+          });
+
+          trackerColumns[status]
+            .appendChild(card);
+
+        });
+
     });
 
-    // Details button
-    card.querySelector(".details-btn").addEventListener("click", (e) => {
-      e.stopPropagation();
-      openModal(job);
-    });
-
-    // Remove button
-    card.querySelector(".remove-btn").addEventListener("click", (e) => {
-      e.stopPropagation();
-      removeJobFromTracker(job.id);
-    });
-
-    // Clicking the card also opens modal
-    card.addEventListener("click", () => {
-      openModal(job);
-    });
-
-    return card;
-  }
-
-  function getJobById(id) {
-    return savedJobs.find(j => j.id === id);
-  }
-
-  board.applied.forEach(id => {
-    const job = getJobById(id);
-    if (job) document.getElementById("appliedZone").appendChild(createCard(job, "applied"));
-  });
-
-  board.interview.forEach(id => {
-    const job = getJobById(id);
-    if (job) document.getElementById("interviewZone").appendChild(createCard(job, "interview"));
-  });
-
-  board.offer.forEach(id => {
-    const job = getJobById(id);
-    if (job) document.getElementById("offerZone").appendChild(createCard(job, "offer"));
-  });
 }
 
-//////////////////////////////////////////////////////
-// DRAG + DROP
-//////////////////////////////////////////////////////
+/* =========================
+   DRAG + DROP
+========================= */
 
-function enableDragDrop() {
-  const zones = document.querySelectorAll(".drop-zone");
+Object.keys(trackerColumns)
+  .forEach(status => {
 
-  zones.forEach(zone => {
-    zone.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      zone.style.background = "#edf2fb";
-    });
+    const column =
+      trackerColumns[status];
 
-    zone.addEventListener("dragleave", () => {
-      zone.style.background = "transparent";
-    });
+    /* ALLOW DROP */
 
-    zone.addEventListener("drop", (e) => {
-      e.preventDefault();
-      zone.style.background = "transparent";
+    column.addEventListener(
+      "dragover",
+      e => {
+        e.preventDefault();
+      }
+    );
 
-      const jobId = parseInt(e.dataTransfer.getData("text/plain"));
-      const fromStatus = e.dataTransfer.getData("fromStatus");
-      const toStatus = zone.parentElement.dataset.status;
+    /* DROP EVENT */
 
-      moveJob(jobId, fromStatus, toStatus);
-    });
-  });
-}
+    column.addEventListener(
+      "drop",
+      () => {
 
-//////////////////////////////////////////////////////
-// MOVE JOB BETWEEN COLUMNS
-//////////////////////////////////////////////////////
+        if (!draggedJob) return;
 
-function moveJob(jobId, fromStatus, toStatus) {
-  if (fromStatus === toStatus) return;
+        const { job, from } =
+          draggedJob;
 
-  const board = getTrackerBoard();
+        /* REMOVE FROM OLD COLUMN */
 
-  board[fromStatus] = board[fromStatus].filter(id => id !== jobId);
+        trackerState[from] =
+          trackerState[from]
+            .filter(j => j.id !== job.id);
 
-  if (!board[toStatus].includes(jobId)) {
-    board[toStatus].push(jobId);
-  }
+        /* PREVENT DUPLICATES */
 
-  saveTrackerBoard(board);
-  renderBoard();
-}
+        const exists =
+          trackerState[status]
+            .some(j => j.id === job.id);
 
-//////////////////////////////////////////////////////
-// REMOVE JOB FROM TRACKER (NOT SAVED JOBS)
-//////////////////////////////////////////////////////
+        if (!exists) {
 
-function removeJobFromTracker(jobId) {
-  const board = getTrackerBoard();
+          trackerState[status]
+            .push(job);
 
-  board.applied = board.applied.filter(id => id !== jobId);
-  board.interview = board.interview.filter(id => id !== jobId);
-  board.offer = board.offer.filter(id => id !== jobId);
+          /* CONFETTI ON OFFER */
+          if (status === "offer") {
+            launchConfetti();
+          }
 
-  saveTrackerBoard(board);
-  renderBoard();
-}
+        }
 
-//////////////////////////////////////////////////////
-// MODAL
-//////////////////////////////////////////////////////
+        saveTrackerState();
 
-function openModal(job) {
-  const modal = document.getElementById("trackerModal");
-  const details = document.getElementById("trackerJobDetails");
+        renderTracker();
 
-  details.innerHTML = `
-    <h2>${job.title}</h2>
-    <p><strong>${job.company}</strong> • ${job.location || "Location not listed"}</p>
+        draggedJob = null;
 
-    <div style="margin-top:12px;">
-      <span class="tag">${job.salary_range || "Salary not listed"}</span>
-      <span class="tag">${job.type || "Type not listed"}</span>
-    </div>
+      }
+    );
 
-    <hr style="margin:15px 0;">
-
-    <h3>Description</h3>
-    <p>${job.description || "No description available."}</p>
-
-    <h3>Required Skills</h3>
-    <ul>
-      ${(job.skills_required || []).map(skill => `<li>${skill}</li>`).join("")}
-    </ul>
-  `;
-
-  modal.classList.remove("hidden");
-}
-
-document.getElementById("closeTrackerModal").addEventListener("click", () => {
-  document.getElementById("trackerModal").classList.add("hidden");
 });
 
-//////////////////////////////////////////////////////
-// INIT
-//////////////////////////////////////////////////////
+/* =========================
+   INITIAL RENDER
+========================= */
 
-function initTracker() {
-  syncSavedJobsIntoBoard();
-  renderBoard();
-  enableDragDrop();
-}
-
-initTracker();
+renderTracker();

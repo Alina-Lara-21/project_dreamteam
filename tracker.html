@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>JobFinder - Tracker</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
 
@@ -15,10 +15,10 @@
   </div>
 
   <div class="nav-right">
-    <a href="index.html"><button class="nav-btn">Jobs</button></a>
-    <a href="compare.html"><button class="nav-btn">Compare</button></a>
-    <a href="tracker.html"><button class="nav-btn">Tracker</button></a>
-    <a href="profile.html"><button class="nav-btn">Profile</button></a>
+    <a href="/"><button class="nav-btn">Jobs</button></a>
+    <a href="/compare"><button class="nav-btn">Compare</button></a>
+    <a href="/tracker"><button class="nav-btn">Tracker</button></a>
+    <a href="/profile"><button class="nav-btn">Profile</button></a>
   </div>
 </nav>
 
@@ -31,19 +31,24 @@
 
   <div class="tracker-columns">
 
-    <div class="column" data-status="applied">
+    <div class="column" data-column="saved">
+      <h3>Saved</h3>
+      <div class="drop-zone" id="savedColumn"></div>
+    </div>
+
+    <div class="column" data-column="applied">
       <h3>Applied</h3>
-      <div class="drop-zone" id="appliedZone"></div>
+      <div class="drop-zone" id="appliedColumn"></div>
     </div>
 
-    <div class="column" data-status="interview">
+    <div class="column" data-column="interview">
       <h3>Interview</h3>
-      <div class="drop-zone" id="interviewZone"></div>
+      <div class="drop-zone" id="interviewColumn"></div>
     </div>
 
-    <div class="column" data-status="offer">
+    <div class="column" data-column="offer">
       <h3>Offer</h3>
-      <div class="drop-zone" id="offerZone"></div>
+      <div class="drop-zone" id="offerColumn"></div>
     </div>
 
   </div>
@@ -58,6 +63,6 @@
   </div>
 </div>
 
-<script src="tracker.js"></script>
+<script src="/static/tracker.js"></script>
 </body>
 </html>
