@@ -2,27 +2,35 @@ from models import Job, MatchResult, UserProfile
 from services.skill_mapper import build_user_skill_pool, normalize_many
 
 
-def _build_explanation(
-    matched_skills: list[str],
-    courses: list[str],
-    projects: list[str],
-) -> str:
-    if matched_skills:
-        preview = ", ".join(skill.title() for skill in matched_skills[:3])
-        source_parts: list[str] = []
-        if courses:
-            source_parts.append("coursework")
-        if projects:
-            source_parts.append("projects")
-        source_text = " and ".join(source_parts) if source_parts else "your profile"
-        return f"Matched based on your {preview} experience from {source_text}."
-    return "This role has skill gaps based on your current profile."
+def _sentence_20_words(text: str) -> str:
+    words = text.strip().split()
+    if len(words) > 20:
+        words = words[:20]
+    out = " ".join(words).rstrip(".!?")
+    return f"{out}."
+
+
+def generate_match_reason(profile: UserProfile, job: Job, score: int) -> str:
+    user_skills = set(build_user_skill_pool(profile.skills, profile.courses))
+    required_skills = set(normalize_many(job.skills_required))
+    matched = sorted(user_skills.intersection(required_skills))
+    coursework = [c.strip() for c in profile.courses if c.strip()]
+    projects = [p.strip() for p in profile.projects if p.strip()]
+
+    if score >= 80 and matched:
+        top = ", ".join(matched[:2])
+        return _sentence_20_words(f"Your {top} skills align strongly with this role's requirements")
+    if score >= 60 and coursework:
+        top_course = ", ".join(coursework[:2])
+        return _sentence_20_words(f"Your coursework in {top_course} supports this job's core responsibilities")
+    if projects:
+        top_project = ", ".join(projects[:2])
+        return _sentence_20_words(f"Your project experience in {top_project} can help bridge remaining skill gaps")
+    return _sentence_20_words("Your background shows partial alignment, and this role can grow your practical skills")
 
 
 def match_jobs(user_profile: UserProfile, jobs_list: list[Job]) -> list[MatchResult]:
     user_skills = set(build_user_skill_pool(user_profile.skills, user_profile.courses))
-    courses = normalize_many(user_profile.courses)
-    projects = [project.strip() for project in user_profile.projects if project.strip()]
 
     results: list[MatchResult] = []
     for job in jobs_list:
@@ -44,7 +52,7 @@ def match_jobs(user_profile: UserProfile, jobs_list: list[Job]) -> list[MatchRes
                 match_score=score,
                 matched_skills=matched_skills,
                 missing_skills=missing_skills,
-                explanation=_build_explanation(matched_skills, courses, projects),
+                explanation=generate_match_reason(user_profile, job, score),
                 salary_range=job.salary_range,
             )
         )

@@ -9,6 +9,8 @@ const API_BASE = window.__API_BASE__ || window.location.origin;
 //////////////////////////////////////////////////////
 
 let jobs = [];
+let visbileJobsCount = 5; 
+const JOBS_PER_PAGE = 5; 
 let matchResults = [];
 let selectedType = null;
 let currentSearch = "";
@@ -117,7 +119,7 @@ function setupBubbleInput(inputId, containerId, listRef) {
 
 async function fetchJobs() {
   try {
-    const response = await fetch(`${API_BASE}/jobs`);
+    const response = await fetch(`${API_BASE}/jobs?limit=2000`);
     const data = await response.json();
     jobs = data.jobs || [];
     document.getElementById("totalJobsCount").textContent = jobs.length;
@@ -150,6 +152,97 @@ async function fetchMatches(skills, courses, resumeText) {
 
   } catch (error) {
     console.error("Error fetching matches:", error);
+    return [];
+  }
+}
+
+function _readInputList(primaryId, fallbackId) {
+  const source = document.getElementById(primaryId) || document.getElementById(fallbackId);
+  if (!source) return [];
+  const raw = source.value || "";
+  return raw
+    .split(",")
+    .map(item => item.trim())
+    .filter(Boolean);
+}
+
+function _toScore(job) {
+  return Number(job.matchScore ?? job.match_score ?? 0);
+}
+
+function _toReason(job) {
+  return job.matchReason || job.explanation || "Your profile partially matches this role.";
+}
+
+function _toMatchedSkills(job) {
+  return job.matchedSkills || job.matched_skills || [];
+}
+
+function _toMissingSkills(job) {
+  return job.missingSkills || job.missing_skills || [];
+}
+
+function _badgeColor(score) {
+  if (score >= 80) return "#2e7d32";
+  if (score >= 60) return "#f9a825";
+  return "#c62828";
+}
+
+function renderMatchCard(job) {
+  const score = _toScore(job);
+  const matchedSkills = _toMatchedSkills(job);
+  const missingSkills = _toMissingSkills(job);
+  const reason = _toReason(job);
+
+  return `
+    <div class="recommended-card" style="border:1px solid #ececec;padding:14px;border-radius:12px;">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;">
+        <div>
+          <h3 style="margin:0;">${job.title || "Untitled role"}</h3>
+          <p style="margin:6px 0 0 0;">${job.company || "Unknown company"} • ${job.location || "Location not listed"}</p>
+        </div>
+        <span class="match-pill" style="background:${_badgeColor(score)};color:#fff;padding:4px 10px;border-radius:999px;font-weight:700;">
+          ${score}% Match
+        </span>
+      </div>
+      <p style="margin:10px 0 8px 0;color:#444;">${job.description || "Description not provided."}</p>
+      <p style="margin:0 0 10px 0;color:#222;font-weight:600;">${reason}</p>
+      <div style="margin:0 0 8px 0;">
+        <strong>Matched:</strong>
+        ${(matchedSkills.length ? matchedSkills : ["None"]).map(s => `<span class="tag" style="background:#e8f5e9;color:#1b5e20;margin-left:6px;">${s}</span>`).join("")}
+      </div>
+      <div>
+        <strong>Missing:</strong>
+        ${(missingSkills.length ? missingSkills : ["None"]).map(s => `<span class="tag" style="background:#fff8e1;color:#8a6d1f;margin-left:6px;">${s}</span>`).join("")}
+      </div>
+    </div>
+  `;
+}
+
+async function findJobs() {
+  const target = document.getElementById("jobResults") || document.getElementById("recommendedJobs");
+  if (!target) return [];
+
+  const payload = {
+    skills: skillTags.length ? [...skillTags] : _readInputList("skills", "skillsInput"),
+    courses: courseTags.length ? [...courseTags] : _readInputList("coursework", "courseworkInput"),
+    projects: expTags.length ? [...expTags] : _readInputList("experience", "experienceInput")
+  };
+
+  try {
+    const response = await fetch(`${API_BASE}/match`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error(`Match request failed: ${response.status}`);
+    const data = await response.json();
+    const matches = Array.isArray(data.matches) ? data.matches : [];
+    target.innerHTML = matches.map(renderMatchCard).join("");
+    return matches;
+  } catch (error) {
+    console.error("Could not run AI job match:", error);
+    target.innerHTML = `<p style="color:#555;">We couldn't load AI matches right now. Please try again.</p>`;
     return [];
   }
 }
@@ -425,7 +518,7 @@ document.getElementById("filterBtn").addEventListener("click", async () => {
 
   saveUserProfile(profile);
 
-  matchResults = await fetchMatches(profile.skills, profile.courses, profile.resume_text || "");
+  matchResults = await findJobs();
 
   renderRecommendations();
   displayJobs();
@@ -447,7 +540,7 @@ document.getElementById("clearBtn").addEventListener("click", async () => {
 
   saveUserProfile({ skills: [], courses: [], projects: [], resume_text: "" });
 
-  matchResults = await fetchMatches([], [], "");
+  matchResults = await findJobs();
 
   renderRecommendations();
   displayJobs();
@@ -505,7 +598,7 @@ async function init() {
   renderTagBubbles("courseworkBubbles", courseTags);
   renderTagBubbles("experienceBubbles", expTags);
 
-  matchResults = await fetchMatches(profile.skills, profile.courses, profile.resume_text || "");
+  matchResults = await findJobs();
 
   renderRecommendations();
   displayJobs();

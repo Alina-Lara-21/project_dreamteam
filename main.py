@@ -504,18 +504,49 @@ async def get_job(request: Request, job_id: int) -> Job:
     return doc_to_job(doc)
 
 
-@app.post("/match", response_model=MatchResponse)
+def _match_payload_item(match: dict, job: Job | None) -> dict:
+    # TODO: verify if frontend should consume only camelCase once old clients are migrated.
+    job_id = match["job_id"]
+    title = job.title if job else match["title"]
+    company = job.company if job else match["company"]
+    location = job.location if job else None
+    description = job.description if job else "Description not provided."
+    skills_required = job.skills_required if job else []
+    match_reason = match["explanation"]
+    return {
+        "job_id": job_id,
+        "match_score": match["match_score"],
+        "matched_skills": match["matched_skills"],
+        "missing_skills": match["missing_skills"],
+        "explanation": match_reason,
+        "id": job_id,
+        "title": title,
+        "company": company,
+        "location": location,
+        "description": description,
+        "skills_required": skills_required,
+        "matchScore": match["match_score"],
+        "matchReason": match_reason,
+        "matchedSkills": match["matched_skills"],
+        "missingSkills": match["missing_skills"],
+    }
+
+
+@app.post("/match")
 async def post_match(
     request: Request,
     profile: UserProfile,
     learner: DependencyOptionalProgressUser,
     db: Session = Depends(get_db),
     apply_saved_profile: bool = Query(default=True),
-) -> MatchResponse:
+) -> dict[str, list[dict]]:
     prefs = load_preferences_map(db, learner.id) if learner else {}
     effective = merge_user_profile(prefs, profile) if (learner and apply_saved_profile) else profile
     jobs = await load_jobs_for_match(request)
-    return MatchResponse(matches=match_jobs(effective, jobs))
+    raw_matches = match_jobs(effective, jobs)
+    by_job_id = {job.id: job for job in jobs}
+    payload = [_match_payload_item(m.model_dump(), by_job_id.get(m.job_id)) for m in raw_matches]
+    return {"matches": payload}
 
 
 @app.post("/skill-gap", response_model=SkillGapResponse)
