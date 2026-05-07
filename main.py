@@ -53,7 +53,7 @@ from services.jobs_mongo import (
     count_jobs,
 )
 from services.matcher import match_jobs
-from services.skill_mapper import normalize_many
+from services.skill_mapper import normalize_many, split_terms
 
 _load_dotenv()
 
@@ -405,19 +405,10 @@ def generate_resume(profile: UserProfile) -> ResumeGenerateResponse:
 
 @app.post("/profile/analyze")
 def analyze_profile(profile: UserProfile) -> dict:
-    """Use AI to extract skills from resume text."""
-    try:
-        from openai import OpenAI
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        prompt = f"Extract key skills, courses, and projects from this resume: {profile.resume_text}"
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=200
-        )
-        return {"extracted": response.choices[0].message.content}
-    except Exception as e:
-        return {"error": f"AI analysis failed: {str(e)}"}
+    """Extract keywords from resume text without external AI."""
+    terms = split_terms(profile.resume_text or "")
+    extracted_terms = [term for term in terms if len(term) > 2]
+    return {"extracted": ", ".join(extracted_terms[:50])}
 
 
 # Serve the HTML/CSS/JS app from the project root.

@@ -27,12 +27,36 @@ function getUserProfile() {
     skills: [],
     courses: [],
     projects: [],
-    resume_text: ""
+    resume_text: "",
+    location: "",
+    selectedType: null,
+    search: "",
+    sort: "best"
   };
 }
 
 function saveUserProfile(profile) {
   localStorage.setItem("userProfile", JSON.stringify(profile));
+}
+
+function persistFilterState() {
+  const profile = getUserProfile();
+  profile.skills = skillTags;
+  profile.courses = courseTags;
+  profile.projects = expTags;
+  profile.location = document.getElementById("locationInput").value.trim();
+  profile.selectedType = selectedType;
+  profile.search = currentSearch;
+  profile.sort = currentSort;
+  saveUserProfile(profile);
+}
+
+function debounce(fn, delay = 180) {
+  let timeout;
+  return (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => fn(...args), delay);
+  };
 }
 
 //////////////////////////////////////////////////////
@@ -51,6 +75,7 @@ function updateSavedCount() {
 function renderTagBubbles(containerId, listRef) {
   const container = document.getElementById(containerId);
   container.innerHTML = "";
+  const fragment = document.createDocumentFragment();
 
   listRef.forEach((tag, index) => {
     const bubble = document.createElement("div");
@@ -64,10 +89,13 @@ function renderTagBubbles(containerId, listRef) {
     bubble.querySelector("span").addEventListener("click", () => {
       listRef.splice(index, 1);
       renderTagBubbles(containerId, listRef);
+      persistFilterState();
     });
 
-    container.appendChild(bubble);
+    fragment.appendChild(bubble);
   });
+
+  container.appendChild(fragment);
 }
 
 function setupBubbleInput(inputId, containerId, listRef) {
@@ -86,6 +114,8 @@ function setupBubbleInput(inputId, containerId, listRef) {
 
       input.value = parts[parts.length - 1].trim();
       renderTagBubbles(containerId, listRef);
+      persistFilterState();
+      displayJobs(); // Filter immediately when bubbles are added
     }
   });
 
@@ -102,11 +132,15 @@ function setupBubbleInput(inputId, containerId, listRef) {
 
       input.value = "";
       renderTagBubbles(containerId, listRef);
+      persistFilterState();
+      displayJobs(); // Filter immediately when bubbles are added
     }
 
     if (e.key === "Backspace" && input.value.trim() === "" && listRef.length > 0) {
       listRef.pop();
       renderTagBubbles(containerId, listRef);
+      persistFilterState();
+      displayJobs(); // Filter immediately when bubbles are removed
     }
   });
 }
@@ -220,6 +254,26 @@ function compareJob(job) {
 // APPLY FILTERS + SORT
 //////////////////////////////////////////////////////
 
+function normalizeFilterText(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function jobMatchesTerms(job, terms) {
+  const haystack = [
+    job.title,
+    job.company,
+    job.location,
+    job.description,
+    job.requirements,
+    ...(job.skills_required || [])
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return terms.some(term => haystack.includes(term.toLowerCase()));
+}
+
 function applyFilters(list) {
   let filtered = [...list];
 
@@ -231,16 +285,29 @@ function applyFilters(list) {
     );
   }
 
+  // SKILLS / COURSEWORK / EXPERIENCE TAGS
+  if (skillTags.length > 0) {
+    filtered = filtered.filter(job => jobMatchesTerms(job, skillTags));
+  }
+
+  if (courseTags.length > 0) {
+    filtered = filtered.filter(job => jobMatchesTerms(job, courseTags));
+  }
+
+  if (expTags.length > 0) {
+    filtered = filtered.filter(job => jobMatchesTerms(job, expTags));
+  }
+
   // FILTER BY TYPE
   if (selectedType) {
     filtered = filtered.filter(item => item.type === selectedType);
   }
 
   // LOCATION FILTER
-  const locInput = document.getElementById("locationInput").value.trim();
+  const locInput = normalizeFilterText(document.getElementById("locationInput").value);
   if (locInput) {
     filtered = filtered.filter(item =>
-      (item.location || "").toLowerCase().includes(locInput.toLowerCase())
+      normalizeFilterText(item.location).includes(locInput)
     );
   }
 
@@ -271,6 +338,7 @@ function applyFilters(list) {
 function renderRecommendations() {
   const container = document.getElementById("recommendedJobs");
   container.innerHTML = "";
+  const fragment = document.createDocumentFragment();
 
   const ranked = [...matchResults].sort((a, b) => b.match_score - a.match_score);
   const top3 = ranked.slice(0, 3);
@@ -292,8 +360,10 @@ function renderRecommendations() {
       <span class="match-pill">${match.match_score}% Match</span>
     `;
 
-    container.appendChild(card);
+    fragment.appendChild(card);
   });
+
+  container.appendChild(fragment);
 }
 
 //////////////////////////////////////////////////////
@@ -304,8 +374,10 @@ function displayJobs() {
   const container = document.getElementById("jobList");
   container.innerHTML = "";
 
+  const matchMap = new Map(matchResults.map(m => [m.job_id, m]));
+
   let combined = jobs.map(job => {
-    const match = matchResults.find(m => m.job_id === job.id);
+    const match = matchMap.get(job.id);
 
     return {
       ...job,
@@ -319,6 +391,7 @@ function displayJobs() {
   combined = applyFilters(combined);
 
   document.getElementById("resultsCount").textContent = `${combined.length} results`;
+  const fragment = document.createDocumentFragment();
 
   combined.forEach(job => {
     const card = document.createElement("div");
@@ -369,8 +442,10 @@ function displayJobs() {
       compareJob(job);
     });
 
-    container.appendChild(card);
+    fragment.appendChild(card);
   });
+
+  container.appendChild(fragment);
 }
 
 //////////////////////////////////////////////////////
@@ -458,11 +533,41 @@ document.getElementById("closeModal").addEventListener("click", () => {
 //////////////////////////////////////////////////////
 
 document.getElementById("filterBtn").addEventListener("click", async () => {
+  const skillInput = document.getElementById("skillsInput");
+  const courseInput = document.getElementById("courseworkInput");
+  const expInput = document.getElementById("experienceInput");
+
+  const skillValue = skillInput.value.trim();
+  const courseValue = courseInput.value.trim();
+  const expValue = expInput.value.trim();
+
+  if (skillValue && !skillTags.includes(skillValue)) {
+    skillTags.push(skillValue);
+  }
+  if (courseValue && !courseTags.includes(courseValue)) {
+    courseTags.push(courseValue);
+  }
+  if (expValue && !expTags.includes(expValue)) {
+    expTags.push(expValue);
+  }
+
+  skillInput.value = "";
+  courseInput.value = "";
+  expInput.value = "";
+
+  renderTagBubbles("skillsBubbles", skillTags);
+  renderTagBubbles("courseworkBubbles", courseTags);
+  renderTagBubbles("experienceBubbles", expTags);
+
   const profile = getUserProfile();
 
   profile.skills = skillTags;
   profile.courses = courseTags;
   profile.projects = expTags;
+  profile.location = document.getElementById("locationInput").value.trim();
+  profile.selectedType = selectedType;
+  profile.search = currentSearch;
+  profile.sort = currentSort;
 
   saveUserProfile(profile);
 
@@ -482,11 +587,24 @@ document.getElementById("clearBtn").addEventListener("click", async () => {
   renderTagBubbles("experienceBubbles", expTags);
 
   document.getElementById("locationInput").value = "";
+  document.getElementById("searchBar").value = "";
+  document.getElementById("sortSelect").value = "best";
 
   selectedType = null;
+  currentSearch = "";
+  currentSort = "best";
   document.querySelectorAll(".bubble").forEach(b => b.classList.remove("active-bubble"));
 
-  saveUserProfile({ skills: [], courses: [], projects: [], resume_text: "" });
+  saveUserProfile({
+    skills: [],
+    courses: [],
+    projects: [],
+    resume_text: "",
+    location: "",
+    selectedType: null,
+    search: "",
+    sort: "best"
+  });
 
   matchResults = await fetchMatches([], [], "");
 
@@ -505,6 +623,10 @@ document.querySelectorAll(".bubble").forEach(btn => {
     document.querySelectorAll(".bubble").forEach(b => b.classList.remove("active-bubble"));
     btn.classList.add("active-bubble");
 
+    const profile = getUserProfile();
+    profile.selectedType = selectedType;
+    saveUserProfile(profile);
+
     displayJobs();
   });
 });
@@ -513,14 +635,28 @@ document.querySelectorAll(".bubble").forEach(btn => {
 // SEARCH + SORT
 //////////////////////////////////////////////////////
 
+const debouncedDisplayJobs = debounce(() => {
+  const profile = getUserProfile();
+  profile.search = currentSearch;
+  saveUserProfile(profile);
+  displayJobs();
+});
+
 document.getElementById("searchBar").addEventListener("input", (e) => {
   currentSearch = e.target.value;
-  displayJobs();
+  debouncedDisplayJobs();
 });
 
 document.getElementById("sortSelect").addEventListener("change", (e) => {
   currentSort = e.target.value;
+  const profile = getUserProfile();
+  profile.sort = currentSort;
+  saveUserProfile(profile);
   displayJobs();
+});
+
+document.getElementById("locationInput").addEventListener("input", () => {
+  persistFilterState();
 });
 
 //////////////////////////////////////////////////////
@@ -541,10 +677,23 @@ async function init() {
   skillTags = profile.skills || [];
   courseTags = profile.courses || [];
   expTags = profile.projects || [];
+  selectedType = profile.selectedType || null;
+  currentSearch = profile.search || "";
+  currentSort = profile.sort || "best";
 
   renderTagBubbles("skillsBubbles", skillTags);
   renderTagBubbles("courseworkBubbles", courseTags);
   renderTagBubbles("experienceBubbles", expTags);
+
+  document.getElementById("locationInput").value = profile.location || "";
+  document.getElementById("searchBar").value = currentSearch;
+  document.getElementById("sortSelect").value = currentSort;
+
+  if (selectedType) {
+    document.querySelectorAll(".bubble").forEach(b => {
+      b.classList.toggle("active-bubble", b.dataset.type === selectedType);
+    });
+  }
 
   matchResults = await fetchMatches(profile.skills, profile.courses, profile.resume_text || "");
 

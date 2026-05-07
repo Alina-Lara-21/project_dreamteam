@@ -14,6 +14,11 @@ const clearBtn = document.getElementById("clearProfileBtn");
 const bubbles = document.querySelectorAll(".bubble");
 let selectedTypes = [];
 
+// Profile tag arrays
+let profileSkills = [];
+let profileCoursework = [];
+let profileExperience = [];
+
 // Header elements
 const profileAvatar = document.getElementById("profileAvatar");
 const profileHeaderName = document.getElementById("profileHeaderName");
@@ -26,25 +31,72 @@ const profileCompareJobs = document.getElementById("profileCompareJobs");
 const profileTrackerJobs = document.getElementById("profileTrackerJobs");
 
 // ------------------------------
-// Extract keywords from resume
+// Tag Bubble System
 // ------------------------------
-function extractSkillsFromResume(text) {
-  const keywords = [
-    "Python", "Java", "C++", "C#", "JavaScript", "HTML", "CSS", "React",
-    "Node.js", "SQL", "MongoDB", "AWS", "Linux", "Git", "Docker",
-    "Networking", "Cybersecurity", "Machine Learning", "Excel", "Figma",
-    "API", "CI/CD", "Unity", "Data Structures", "Operating Systems"
-  ];
+function renderTagBubbles(containerId, listRef) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = "";
+  const fragment = document.createDocumentFragment();
 
-  let found = [];
+  listRef.forEach((tag, index) => {
+    const bubble = document.createElement("div");
+    bubble.className = "input-bubble";
 
-  keywords.forEach(skill => {
-    if (text.toLowerCase().includes(skill.toLowerCase())) {
-      found.push(skill);
+    bubble.innerHTML = `
+      ${tag}
+      <span title="Remove">&times;</span>
+    `;
+
+    bubble.querySelector("span").addEventListener("click", () => {
+      listRef.splice(index, 1);
+      renderTagBubbles(containerId, listRef);
+    });
+
+    fragment.appendChild(bubble);
+  });
+
+  container.appendChild(fragment);
+}
+
+function setupBubbleInput(inputId, containerId, listRef) {
+  const input = document.getElementById(inputId);
+
+  input.addEventListener("input", () => {
+    if (input.value.includes(",")) {
+      const parts = input.value.split(",");
+
+      parts.slice(0, -1).forEach(part => {
+        const value = part.trim();
+        if (value && !listRef.includes(value)) {
+          listRef.push(value);
+        }
+      });
+
+      input.value = parts[parts.length - 1].trim();
+      renderTagBubbles(containerId, listRef);
     }
   });
 
-  return found;
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+
+      const value = input.value.trim();
+      if (!value) return;
+
+      if (!listRef.includes(value)) {
+        listRef.push(value);
+      }
+
+      input.value = "";
+      renderTagBubbles(containerId, listRef);
+    }
+
+    if (e.key === "Backspace" && input.value.trim() === "" && listRef.length > 0) {
+      listRef.pop();
+      renderTagBubbles(containerId, listRef);
+    }
+  });
 }
 
 // ------------------------------
@@ -56,9 +108,9 @@ function updateProfileProgress() {
 
   if (nameInput.value.trim() !== "") filled++;
   if (emailInput.value.trim() !== "") filled++;
-  if (skillsInput.value.trim() !== "") filled++;
-  if (courseworkInput.value.trim() !== "") filled++;
-  if (experienceInput.value.trim() !== "") filled++;
+  if (profileSkills.length > 0) filled++;
+  if (profileCoursework.length > 0) filled++;
+  if (profileExperience.length > 0) filled++;
   if (locationInput.value.trim() !== "") filled++;
 
   const percent = Math.round((filled / total) * 100);
@@ -124,9 +176,32 @@ function loadProfile() {
 
   nameInput.value = profile.name || "";
   emailInput.value = profile.email || "";
-  skillsInput.value = profile.skills || "";
-  courseworkInput.value = profile.coursework || "";
-  experienceInput.value = profile.experience || "";
+
+  // Handle both old string format and new array format
+  if (Array.isArray(profile.skills)) {
+    profileSkills = profile.skills;
+  } else if (typeof profile.skills === 'string') {
+    profileSkills = profile.skills.split(',').map(s => s.trim()).filter(s => s);
+  } else {
+    profileSkills = [];
+  }
+
+  if (Array.isArray(profile.coursework)) {
+    profileCoursework = profile.coursework;
+  } else if (typeof profile.coursework === 'string') {
+    profileCoursework = profile.coursework.split(',').map(s => s.trim()).filter(s => s);
+  } else {
+    profileCoursework = [];
+  }
+
+  if (Array.isArray(profile.experience)) {
+    profileExperience = profile.experience;
+  } else if (typeof profile.experience === 'string') {
+    profileExperience = profile.experience.split(',').map(s => s.trim()).filter(s => s);
+  } else {
+    profileExperience = [];
+  }
+
   locationInput.value = profile.location || "";
 
   resumePreview.value = profile.resumeText || "";
@@ -142,6 +217,10 @@ function loadProfile() {
     }
   });
 
+  renderTagBubbles("profileSkillsBubbles", profileSkills);
+  renderTagBubbles("profileCourseworkBubbles", profileCoursework);
+  renderTagBubbles("profileExperienceBubbles", profileExperience);
+
   updateProfileHeader();
   updateProfileProgress();
   updateProfileStats();
@@ -154,9 +233,9 @@ function saveProfile() {
   const profile = {
     name: nameInput.value.trim(),
     email: emailInput.value.trim(),
-    skills: skillsInput.value.trim(),
-    coursework: courseworkInput.value.trim(),
-    experience: experienceInput.value.trim(),
+    skills: profileSkills,
+    coursework: profileCoursework,
+    experience: profileExperience,
     location: locationInput.value.trim(),
     types: selectedTypes,
     resumeText: resumePreview.value.trim()
@@ -177,14 +256,18 @@ function clearProfile() {
 
   nameInput.value = "";
   emailInput.value = "";
-  skillsInput.value = "";
-  courseworkInput.value = "";
-  experienceInput.value = "";
+  profileSkills = [];
+  profileCoursework = [];
+  profileExperience = [];
   locationInput.value = "";
   resumePreview.value = "";
 
   selectedTypes = [];
   bubbles.forEach(b => b.classList.remove("active"));
+
+  renderTagBubbles("profileSkillsBubbles", profileSkills);
+  renderTagBubbles("profileCourseworkBubbles", profileCoursework);
+  renderTagBubbles("profileExperienceBubbles", profileExperience);
 
   updateProfileHeader();
   updateProfileProgress();
@@ -229,18 +312,13 @@ if (resumeUpload) {
       const extractedSkills = extractSkillsFromResume(resumeText);
 
       if (extractedSkills.length > 0) {
-        const existingSkills = skillsInput.value
-          .split(",")
-          .map(s => s.trim())
-          .filter(Boolean);
-
         extractedSkills.forEach(skill => {
-          if (!existingSkills.includes(skill)) {
-            existingSkills.push(skill);
+          if (!profileSkills.includes(skill)) {
+            profileSkills.push(skill);
           }
         });
 
-        skillsInput.value = existingSkills.join(", ");
+        renderTagBubbles("profileSkillsBubbles", profileSkills);
       }
 
       updateProfileProgress();
@@ -254,7 +332,11 @@ if (resumeUpload) {
 // ------------------------------
 // Live Updates
 // ------------------------------
-[nameInput, emailInput, skillsInput, courseworkInput, experienceInput, locationInput].forEach(input => {
+setupBubbleInput("profileSkills", "profileSkillsBubbles", profileSkills);
+setupBubbleInput("profileCoursework", "profileCourseworkBubbles", profileCoursework);
+setupBubbleInput("profileExperience", "profileExperienceBubbles", profileExperience);
+
+[nameInput, emailInput, locationInput].forEach(input => {
   input.addEventListener("input", () => {
     updateProfileHeader();
     updateProfileProgress();
