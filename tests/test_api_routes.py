@@ -97,3 +97,50 @@ def test_ai_search_smoke(client):
     assert "jobs" in data and "matches" in data
     assert isinstance(data["jobs"], list)
     assert isinstance(data["matches"], list)
+
+
+def test_profile_data_empty_on_first_get(client):
+    r = client.post("/progress/start", json={"display_name": "Profile User", "email": "profile@example.com"})
+    assert r.status_code == 200
+    code = r.json()["progress_code"]
+
+    r = client.get("/profile/data", headers={"X-Progress-Code": code})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["user_id"]
+    assert data["full_name"] == ""
+    assert data["email"] == ""
+    assert data["skills"] == ""
+    assert data["coursework"] == ""
+    assert data["experience"] == ""
+    assert data["location"] == ""
+    assert data["job_types"] == ""
+    assert data["resume_text"] == ""
+
+
+def test_profile_data_post_then_get_roundtrip(client):
+    r = client.post("/progress/start", json={"display_name": "Roundtrip", "email": "round@example.com"})
+    code = r.json()["progress_code"]
+    headers = {"X-Progress-Code": code}
+
+    payload = {
+        "full_name": "Round Trip",
+        "email": "round@example.com",
+        "skills": "python, sql",
+        "coursework": "os, db",
+        "experience": "capstone project",
+        "location": "Remote",
+        "job_types": "Internship, Full-Time",
+        "resume_text": "Built backend APIs.",
+    }
+    r = client.post("/profile/data", headers=headers, json=payload)
+    assert r.status_code == 200
+    saved = r.json()
+    assert saved["full_name"] == payload["full_name"]
+    assert saved["updated_at"]
+
+    r = client.get("/profile/data", headers=headers)
+    assert r.status_code == 200
+    loaded = r.json()
+    for key, value in payload.items():
+        assert loaded[key] == value

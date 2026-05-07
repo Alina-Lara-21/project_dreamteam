@@ -3,6 +3,7 @@ from app_db.database import Base, engine
 import app_db.models  # noqa: F401 — registers ORM tables on Base.metadata for create_all
 
 from routers.progress_session import router as progress_router
+from routers.user_profile import router as profile_router
 from routers.user_profile_preferences import router as profile_prefs_router
 from routers.user_saved_jobs import router as saved_jobs_router
 from routers.user_progress_state import router as progress_state_router
@@ -158,6 +159,7 @@ app.add_middleware(
 )
 
 app.include_router(progress_router)
+app.include_router(profile_router)
 app.include_router(profile_prefs_router)
 app.include_router(saved_jobs_router)
 app.include_router(progress_state_router)
