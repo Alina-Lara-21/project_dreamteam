@@ -158,15 +158,52 @@ async function fetchMatches(skills, courses, resumeText) {
 // SAVE + COMPARE
 //////////////////////////////////////////////////////
 
-function saveJob(job) {
-  let saved = JSON.parse(localStorage.getItem("savedJobs")) || [];
+function getSavedJobs() {
+  return JSON.parse(localStorage.getItem("savedJobs")) || [];
+}
 
-  if (!saved.find(j => j.id === job.id)) {
-    saved.push(job);
-    localStorage.setItem("savedJobs", JSON.stringify(saved));
+function normalizeId(id) {
+  return String(id);
+}
+
+function isJobSaved(jobId) {
+  const normalized = normalizeId(jobId);
+  return getSavedJobs().some(j => normalizeId(j.id) === normalized);
+}
+
+function removeSavedJob(jobId) {
+  const normalized = normalizeId(jobId);
+  const saved = getSavedJobs();
+  const filtered = saved.filter(job => normalizeId(job.id) !== normalized);
+  localStorage.setItem("savedJobs", JSON.stringify(filtered));
+  updateSavedCount();
+  return filtered;
+}
+
+function saveJob(job) {
+  const saved = getSavedJobs();
+  const normalized = normalizeId(job.id);
+  const exists = saved.some(j => normalizeId(j.id) === normalized);
+
+  if (exists) {
+    removeSavedJob(job.id);
+    return false;
   }
 
+  saved.push(job);
+  localStorage.setItem("savedJobs", JSON.stringify(saved));
   updateSavedCount();
+  return true;
+}
+
+function updateSaveButton(button, jobId) {
+  if (isJobSaved(jobId)) {
+    button.textContent = "Saved";
+    button.classList.add("saved");
+  } else {
+    button.textContent = "Save";
+    button.classList.remove("saved");
+  }
 }
 
 function compareJob(job) {
@@ -318,9 +355,13 @@ function displayJobs() {
       </div>
     `;
 
-    card.querySelector(".save-btn").addEventListener("click", (e) => {
+    const saveBtn = card.querySelector(".save-btn");
+    updateSaveButton(saveBtn, job.id);
+
+    saveBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       saveJob(job);
+      displayJobs();
     });
 
     card.querySelector(".compare-btn").addEventListener("click", (e) => {

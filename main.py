@@ -403,6 +403,23 @@ def generate_resume(profile: UserProfile) -> ResumeGenerateResponse:
     return ResumeGenerateResponse(bullets=_build_resume_bullets(profile))
 
 
+@app.post("/profile/analyze")
+def analyze_profile(profile: UserProfile) -> dict:
+    """Use AI to extract skills from resume text."""
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        prompt = f"Extract key skills, courses, and projects from this resume: {profile.resume_text}"
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=200
+        )
+        return {"extracted": response.choices[0].message.content}
+    except Exception as e:
+        return {"error": f"AI analysis failed: {str(e)}"}
+
+
 # Serve the HTML/CSS/JS app from the project root.
 _ROOT = Path(__file__).resolve().parent
 
