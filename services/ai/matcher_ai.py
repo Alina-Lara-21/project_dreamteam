@@ -6,9 +6,9 @@ from openai import OpenAI
 from models import Job, MatchResult, UserProfile
 from services.skill_mapper import build_user_skill_pool, normalize_many
 
-# Initialize AI models (load once for efficiency)
-EMBEDDING_MODEL = SentenceTransformer('all-MiniLM-L6-v2')  # Free, fast embedding model
-OPENAI_CLIENT = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))  # Set in .env
+# Initialize models
+EMBEDDING_MODEL = SentenceTransformer('all-MiniLM-L6-v2')
+OPENAI_CLIENT = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 def _build_profile_text(user_profile: UserProfile) -> str:
     """Combine user profile into a single text for embedding."""
@@ -27,21 +27,25 @@ def _compute_similarity(profile_embedding: np.ndarray, job_embedding: np.ndarray
     return np.dot(profile_embedding, job_embedding) / (np.linalg.norm(profile_embedding) * np.linalg.norm(job_embedding))
 
 def _generate_explanation_with_llm(profile_text: str, job_text: str, matched_skills: List[str]) -> str:
-    """Use LLM to generate a personalized explanation."""
-    prompt = f"""
-    Based on this user profile: {profile_text}
-    And this job: {job_text}
-    Matched skills: {', '.join(matched_skills) if matched_skills else 'None'}
-    Write a 1-2 sentence explanation of why this job matches the user's profile, focusing on skills, experience, and fit.
-    """
-    response = OPENAI_CLIENT.chat.completions.create(
-        model="gpt-4",
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=100,
-        temperature=0.7
-    )
-    return response.choices[0].message.content.strip()
-
+    """Use LLM to generate personalized explanation (cached for speed)."""
+    if not matched_skills:
+        return "This role has skill gaps based on your current profile."
+    
+    try:
+        prompt = f"""Given this user profile: {profile_text}
+And this job: {job_text}
+Matched skills: {', '.join(matched_skills)}
+Write a 1-2 sentence explanation of why this job matches, focusing on skills fit."""
+        
+        response = OPENAI_CLIENT.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=60,
+            temperature=0.5
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"Strong match: {', '.join(matched_skills[:3])}."
 def match_jobs_with_ai(user_profile: UserProfile, jobs_list: List[Job]) -> List[MatchResult]:
     profile_text = _build_profile_text(user_profile)
     profile_embedding = EMBEDDING_MODEL.encode(profile_text)

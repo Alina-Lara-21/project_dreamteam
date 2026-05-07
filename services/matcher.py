@@ -1,7 +1,6 @@
 from models import Job, MatchResult, UserProfile
 from services.skill_mapper import build_user_skill_pool, normalize_many, normalize_text
-from services.ai.matcher_ai import match_jobs_with_ai  # Import AI matcher
-
+from services.ai.matcher_ai import match_jobs_with_ai
 
 SKILL_WEIGHT = 0.7
 COURSE_WEIGHT = 0.2
