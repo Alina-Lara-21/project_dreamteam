@@ -1200,4 +1200,107 @@ button.secondary:hover {
   .breakdown-grid {
     grid-template-columns: 1fr;
   }
+
+  #jobSearchChipInput {
+    width: 100%;
+  }
+}
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.nav-btn.active-nav {
+  background: #2b6cd6;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.2);
+}
+
+.sidebar-subtitle {
+  font-size: 0.85rem;
+  color: #555;
+  line-height: 1.45;
+  margin: -8px 0 14px;
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #e6ecf5;
+  backdrop-filter: blur(6px);
+}
+
+.upgraded-hero {
+  border: 1px solid #e1e8f2;
+  box-shadow: 0px 10px 28px rgba(13, 27, 42, 0.06);
+}
+
+.eyebrow {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #3a86ff;
+  margin-bottom: 8px;
+}
+
+.section-heading-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.job-chip-search-wrap {
+  flex: 1;
+  min-width: 200px;
+}
+
+#jobSearchChipInput {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #dce3ee;
+  outline: none;
+  font-size: 0.9rem;
+  background: white;
+}
+
+#jobSearchChipInput:focus {
+  border-color: #3a86ff;
+}
+
+.load-more-wrap {
+  text-align: center;
+  margin: 16px 0 4px;
+}
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 2000;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: #0d1b2a;
+  color: white;
+  font-weight: 700;
+  font-size: 0.9rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.small-danger {
+  padding: 10px 16px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.tracker-actions .view-btn {
+  background: #edf2fb;
+  color: #0d1b2a;
+}
+
+.tracker-actions .view-btn:hover {
+  background: #3a86ff;
+  color: white;
 }

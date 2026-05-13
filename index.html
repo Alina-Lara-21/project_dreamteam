@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>JobFinder - Jobs</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BRIDGE - Jobs</title>
+  <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
 
@@ -15,71 +15,70 @@
   </div>
 
   <div class="nav-right">
-    <a href="/"><button class="nav-btn">Jobs</button></a>
-    <a href="/compare"><button class="nav-btn">Compare</button></a>
-    <a href="/tracker"><button class="nav-btn">Tracker</button></a>
-    <a href="/profile"><button class="nav-btn">Profile</button></a>
+    <a href="/"><button type="button" class="nav-btn active-nav">Jobs</button></a>
+    <a href="/compare"><button type="button" class="nav-btn">Compare</button></a>
+    <a href="/tracker"><button type="button" class="nav-btn">Tracker</button></a>
+    <a href="/profile"><button type="button" class="nav-btn">Profile</button></a>
   </div>
 </nav>
 
+<div id="toast" class="toast hidden"></div>
+
 <div class="layout">
 
-  <!-- SIDEBAR: match inputs -->
-  <aside class="sidebar">
-    <h2>Match profile</h2>
+  <aside class="sidebar glass-card">
+    <h2>Refine search</h2>
+    <p class="sidebar-subtitle">Match using skills, coursework, projects, job type, and location—then apply.</p>
 
     <div class="filter-group">
       <label>Skills</label>
-      <input id="skillsInput" placeholder="Type a skill and press Enter...">
+      <input id="skillsInput" placeholder="Example: Python, HTML, SQL" />
       <div id="skillsBubbles" class="input-bubbles"></div>
     </div>
 
     <div class="filter-group">
       <label>Coursework</label>
-      <input id="courseworkInput" placeholder="Type a course and press Enter...">
+      <input id="courseworkInput" placeholder="Example: Data Structures" />
       <div id="courseworkBubbles" class="input-bubbles"></div>
     </div>
 
     <div class="filter-group">
       <label>Experience / Projects</label>
-      <input id="experienceInput" placeholder="Type experience and press Enter...">
+      <input id="experienceInput" placeholder="Example: Web app, internship" />
       <div id="experienceBubbles" class="input-bubbles"></div>
     </div>
 
-    <!-- JOB TYPE BUBBLES -->
     <div class="filter-group">
       <label>Job Type</label>
       <div class="type-bubbles">
-        <button class="bubble" data-type="Full-Time">Full-Time</button>
-        <button class="bubble" data-type="Part-Time">Part-Time</button>
-        <button class="bubble" data-type="Internship">Internship</button>
+        <button type="button" class="bubble" data-type="Full-Time">Full-Time</button>
+        <button type="button" class="bubble" data-type="Part-Time">Part-Time</button>
+        <button type="button" class="bubble" data-type="Internship">Internship</button>
       </div>
     </div>
 
-    <!-- LOCATION -->
     <div class="filter-group">
-      <label>Location Preference</label>
-      <input id="locationInput" placeholder="Bakersfield, CA or Remote">
+      <label>Location preference</label>
+      <input id="locationInput" placeholder="Bakersfield, CA or Remote" />
     </div>
 
     <div class="filter-buttons">
-      <button class="primary" id="filterBtn">Apply</button>
-      <button class="secondary" id="clearBtn">Clear</button>
+      <button type="button" class="primary" id="filterBtn">Apply filters</button>
+      <button type="button" class="secondary" id="clearBtn">Clear</button>
     </div>
 
     <div class="filter-tip">
-      Tip: Use commas or press Enter to create bubbles
+      Press <strong>Enter</strong> or use commas to create skill bubbles.
     </div>
   </aside>
 
-  <!-- MAIN CONTENT -->
   <section class="job-results">
 
-    <!-- HERO -->
-    <div class="hero">
+    <div class="hero upgraded-hero">
       <div>
-        <h2>Find Your Next Opportunity</h2>
-        <p>Search internships, part-time, and full-time roles matched to your skills.</p>
+        <span class="eyebrow">Career match dashboard</span>
+        <h2>Find your next opportunity faster.</h2>
+        <p>Search jobs, save favorites, compare roles, and track your application progress.</p>
       </div>
 
       <div class="hero-stats">
@@ -87,6 +86,7 @@
           <h3 id="totalJobsCount">0</h3>
           <p>Total Jobs</p>
         </div>
+
         <div class="stat-box">
           <h3 id="savedJobsCount">0</h3>
           <p>Saved Jobs</p>
@@ -94,24 +94,27 @@
       </div>
     </div>
 
-    <!-- AI RECOMMENDATIONS -->
     <div class="ai-recommendations">
-      <h2>AI Recommendations</h2>
-      <p class="subtext">Top matches based on your profile information.</p>
+      <div class="section-heading-row">
+        <div>
+          <h2>AI recommendations</h2>
+          <p class="subtext">Top matches based on your profile and filters.</p>
+        </div>
+      </div>
+
       <div id="recommendedJobs" class="recommended-grid"></div>
     </div>
 
-    <!-- SEARCH + SORT -->
     <div class="results-header">
       <div>
-        <h2>All Jobs</h2>
+        <h2>All jobs</h2>
         <p id="resultsCount"></p>
       </div>
 
       <div class="top-controls">
-        <div style="flex:1;min-width:200px;">
-          <input id="jobSearchChipInput" placeholder="Search jobs — Enter or comma for chips">
-          <div id="jobSearchChipBubbles" class="input-bubbles" style="margin-top:6px;"></div>
+        <div class="job-chip-search-wrap">
+          <input id="jobSearchChipInput" placeholder="Search jobs — Enter or comma for chips" />
+          <div id="jobSearchChipBubbles" class="input-bubbles"></div>
         </div>
 
         <select id="sortSelect">
@@ -123,9 +126,9 @@
       </div>
     </div>
 
-    <!-- JOB LIST -->
     <div id="jobList"></div>
-    <div style="text-align:center;margin:16px 0;">
+
+    <div class="load-more-wrap">
       <button type="button" class="secondary" id="loadMoreJobs">Load more</button>
     </div>
 
@@ -133,7 +136,6 @@
 
 </div>
 
-<!-- JOB MODAL -->
 <div id="jobModal" class="modal hidden">
   <div class="modal-content">
     <span class="close" id="closeModal">&times;</span>

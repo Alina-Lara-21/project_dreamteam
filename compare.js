@@ -7,6 +7,12 @@ function clearCompareJobs() {
   renderCompare();
 }
 
+function truncateCompare(text, max) {
+  const s = String(text || "");
+  if (s.length <= max) return s;
+  return `${s.slice(0, max)}…`;
+}
+
 function renderCompare() {
   const grid = document.getElementById("compareGrid");
   const jobs = loadCompareJobs();
@@ -23,23 +29,27 @@ function renderCompare() {
     return;
   }
 
-  jobs.forEach(job => {
+  jobs.forEach((job) => {
     const card = document.createElement("div");
     card.className = "compare-card";
-
+    const jt = job.job_type || job.type || "—";
+    const desc = truncateCompare(job.description || "", 220);
     card.innerHTML = `
       <div class="compare-top">
         <h3>${job.title}</h3>
         <p>${job.company} • ${job.location || "Location not listed"}</p>
+        <span class="tag">${jt}</span>
         <span class="tag">${job.salary_range || "Salary not listed"}</span>
       </div>
-
       <div class="compare-section">
-        <h4>Required Skills</h4>
-        <ul>${(job.skills_required || []).map(r => `<li>${r}</li>`).join("")}</ul>
+        <h4>Description</h4>
+        <p>${desc || "No description."}</p>
+      </div>
+      <div class="compare-section">
+        <h4>Required skills</h4>
+        <ul>${(job.skills_required || []).map((r) => `<li>${r}</li>`).join("")}</ul>
       </div>
     `;
-
     grid.appendChild(card);
   });
 }

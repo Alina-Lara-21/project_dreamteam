@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>JobFinder - Tracker</title>
+  <title>BRIDGE - Tracker</title>
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
@@ -11,46 +11,49 @@
 <nav class="navbar">
   <div class="nav-left">
     <h1 class="logo">BRIDGE</h1>
-    <span class="tagline">Application Tracker</span>
+    <span class="tagline">Application tracker</span>
   </div>
 
   <div class="nav-right">
-    <a href="/"><button class="nav-btn">Jobs</button></a>
-    <a href="/compare"><button class="nav-btn">Compare</button></a>
-    <a href="/tracker"><button class="nav-btn">Tracker</button></a>
-    <a href="/profile"><button class="nav-btn">Profile</button></a>
+    <a href="/"><button type="button" class="nav-btn">Jobs</button></a>
+    <a href="/compare"><button type="button" class="nav-btn">Compare</button></a>
+    <a href="/tracker"><button type="button" class="nav-btn active-nav">Tracker</button></a>
+    <a href="/profile"><button type="button" class="nav-btn">Profile</button></a>
   </div>
 </nav>
 
 <div class="page-container">
 
   <div class="page-header">
-    <h2>Application Tracker</h2>
-    <p>Drag saved jobs between columns to track your progress</p>
+    <h2>Application tracker</h2>
+    <p>Drag saved jobs between columns to track your progress.</p>
   </div>
 
   <div class="tracker-columns">
 
-    <div class="column" data-status="applied">
-      <h3>Applied</h3>
-      <div class="drop-zone" id="appliedZone"></div>
+    <div class="column" data-column="saved">
+      <h3>Saved <span id="savedCount">0</span></h3>
+      <div class="drop-zone" id="savedColumn"></div>
     </div>
 
-    <div class="column" data-status="interview">
-      <h3>Interview</h3>
-      <div class="drop-zone" id="interviewZone"></div>
+    <div class="column" data-column="applied">
+      <h3>Applied <span id="appliedCount">0</span></h3>
+      <div class="drop-zone" id="appliedColumn"></div>
     </div>
 
-    <div class="column" data-status="offer">
-      <h3>Offer</h3>
-      <div class="drop-zone" id="offerZone"></div>
+    <div class="column" data-column="interview">
+      <h3>Interview <span id="interviewCount">0</span></h3>
+      <div class="drop-zone" id="interviewColumn"></div>
+    </div>
+
+    <div class="column offer-column" data-column="offer">
+      <h3>Offer <span id="offerCount">0</span></h3>
+      <div class="drop-zone" id="offerColumn"></div>
     </div>
 
   </div>
-
 </div>
 
-<!-- MODAL -->
 <div id="trackerModal" class="modal hidden">
   <div class="modal-content">
     <span class="close" id="closeTrackerModal">&times;</span>
