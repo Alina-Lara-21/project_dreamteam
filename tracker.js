@@ -11,6 +11,42 @@ function normalizeId(id) {
   return String(id);
 }
 
+function getProgressCode() {
+  return (
+    localStorage.getItem("bridge_progress_code") ||
+    localStorage.getItem("progressCode") ||
+    localStorage.getItem("progress_code") ||
+    ""
+  );
+}
+
+function authHeaders(extra = {}) {
+  const code = getProgressCode();
+  return code ? { ...extra, "X-Progress-Code": code } : extra;
+}
+
+async function syncSavedJobsFromBackend() {
+  const code = getProgressCode();
+  if (!code) return;
+
+  try {
+    const res = await fetch(`${window.location.origin}/saved-jobs`, {
+      headers: authHeaders(),
+    });
+
+    if (!res.ok) return;
+
+    const data = await res.json();
+    const jobs = data.jobs || data.saved_jobs || [];
+
+    if (jobs.length > 0) {
+      localStorage.setItem("savedJobs", JSON.stringify(jobs));
+    }
+  } catch (err) {
+    console.warn("Could not sync saved jobs from backend", err);
+  }
+}
+
 function getSavedJobs() {
   return JSON.parse(localStorage.getItem("savedJobs")) || [];
 }
@@ -234,4 +270,10 @@ window.addEventListener("click", (e) => {
   }
 });
 
-renderTracker();
+async function initTracker() {
+  await syncSavedJobsFromBackend();
+  syncSavedJobsToTracker();
+  renderTracker();
+}
+
+initTracker();

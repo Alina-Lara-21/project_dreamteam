@@ -33,7 +33,7 @@ function renderCompare() {
     const card = document.createElement("div");
     card.className = "compare-card";
     const jt = job.job_type || job.type || "—";
-    const desc = truncateCompare(job.description || "", 220);
+    const desc = truncateCompare(job.description || "Description not provided.", 220);
     card.innerHTML = `
       <div class="compare-top">
         <h3>${job.title}</h3>
