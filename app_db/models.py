@@ -44,3 +44,18 @@ class UserProgressState(Base):
     last_search_json = Column(Text, nullable=True)
     last_analysis_json = Column(Text, nullable=True)
     profile_preferences_json = Column(Text, nullable=True)
+
+
+class UserProfile(Base):
+    __tablename__ = "user_profiles"
+
+    user_id = Column(String, primary_key=True)
+    full_name = Column(String, default="")
+    email = Column(String, default="")
+    skills = Column(String, default="")
+    coursework = Column(String, default="")
+    experience = Column(String, default="")
+    location = Column(String, default="")
+    job_types = Column(String, default="")
+    resume_text = Column(Text, default="")
+    updated_at = Column(String, default="")

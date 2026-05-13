@@ -7,3 +7,5 @@ pymongo
 motor
 python-dotenv
 pytest
+pdfminer.six
+python-multipart

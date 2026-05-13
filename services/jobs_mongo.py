@@ -86,10 +86,11 @@ def _skills_list_from_doc(doc: dict[str, Any]) -> list[str]:
 
 
 def doc_to_job(doc: dict[str, Any]) -> Job:
-    """Mongo document -> API Job via shared normalization (description, job_type fallbacks)."""
     jid = stable_int_job_id(doc)
     merged: dict[str, Any] = dict(doc)
     merged["id"] = jid
+    merged["description"] = doc.get("description", "") or merged.get("description", "")
+    merged["job_type"] = doc.get("job_type", "") or merged.get("job_type", "")
     skills_required = _skills_list_from_doc(doc)
     if skills_required:
         merged["skills_required"] = skills_required

@@ -11,17 +11,16 @@ class UserProfile(BaseModel):
 
 
 class Job(BaseModel):
-    """API job shape consumed by vanilla JS (`skills_required`, etc.). Maps from Mongo via services.jobs_mongo."""
-
     id: int
     title: str
     company: str
+    location: Optional[str] = None
+
     skills_required: list[str] = Field(default_factory=list)
     salary_range: Optional[str] = None
-    location: Optional[str] = None
-    description: str = "Description not provided."
+    description: str = ""
     requirements: Optional[str] = None
-    job_type: str = "Unspecified"
+    job_type: str = ""
 
 
 class MatchResult(BaseModel):
@@ -65,11 +64,13 @@ class AiSearchResponse(BaseModel):
 
 
 class AiSearchRequest(BaseModel):
-    """Semantic search + skill match over the loaded job catalog (no external LLM required)."""
-
     query: str = ""
     limit: int = Field(default=50, ge=1, le=5000)
     skills: list[str] = Field(default_factory=list)
     courses: list[str] = Field(default_factory=list)
     projects: list[str] = Field(default_factory=list)
     resume_text: Optional[str] = None
+    use_skills: bool = True
+    use_courses: bool = True
+    use_projects: bool = True
+    use_resume_text: bool = True

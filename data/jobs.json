@@ -3,6 +3,8 @@
     "id": 1,
     "title": "Backend Intern",
     "company": "TechCorp",
+    "description": "Join our backend team to build and maintain scalable REST APIs using Python and FastAPI. You will work closely with senior engineers to design SQL schemas, integrate AWS services like S3 and Lambda, and contribute to internal tooling. Ideal for students looking to gain hands-on experience with real production systems in an agile environment.",
+    "job_type": "internship",
     "skills_required": ["python", "sql", "aws", "rest api"],
     "salary_range": "$70k-$90k",
     "location": "Remote"
@@ -11,6 +13,8 @@
     "id": 2,
     "title": "Frontend Developer Intern",
     "company": "BrightWeb",
+    "description": "Work alongside our product team to build responsive, accessible web interfaces using React and modern CSS. You will translate Figma designs into pixel-perfect components, write clean HTML and JavaScript, and participate in code reviews. Great opportunity for students who love building polished user experiences.",
+    "job_type": "internship",
     "skills_required": ["javascript", "react", "css", "html"],
     "salary_range": "$65k-$85k",
     "location": "Los Angeles, CA"
@@ -19,6 +23,8 @@
     "id": 3,
     "title": "Full Stack Engineer",
     "company": "BridgeLabs",
+    "description": "Design and implement features across the full stack using Python on the backend and React on the frontend. Responsibilities include building RESTful services, writing PostgreSQL queries, containerizing services with Docker, and collaborating with product managers on feature specs. You will own features end-to-end in a fast-paced startup environment.",
+    "job_type": "full-time",
     "skills_required": ["python", "react", "postgresql", "docker"],
     "salary_range": "$95k-$125k",
     "location": "Austin, TX"
@@ -27,6 +33,8 @@
     "id": 4,
     "title": "Junior Data Engineer",
     "company": "DataFlow",
+    "description": "Build and maintain data pipelines that move and transform large volumes of structured data. You will work with Python-based ETL frameworks, write complex SQL queries, and contribute to our data modeling layer. Collaborate with data analysts and scientists to ensure clean, reliable data is available for downstream reporting.",
+    "job_type": "full-time",
     "skills_required": ["python", "sql", "data modeling", "etl"],
     "salary_range": "$85k-$110k",
     "location": "Chicago, IL"
@@ -35,6 +43,8 @@
     "id": 5,
     "title": "QA Automation Engineer",
     "company": "QualityWorks",
+    "description": "Own the test automation layer for our web platform. Write Selenium-based test suites in Python, integrate them into CI/CD pipelines, and maintain test coverage reports. Work with developers to triage failures and advocate for testability across the codebase. Experience with pytest and GitHub Actions is a plus.",
+    "job_type": "full-time",
     "skills_required": ["python", "selenium", "testing", "ci/cd"],
     "salary_range": "$78k-$102k",
     "location": "Remote"
@@ -43,6 +53,8 @@
     "id": 6,
     "title": "DevOps Intern",
     "company": "CloudBridge",
+    "description": "Support our infrastructure team in managing Linux-based cloud environments on AWS. You will help automate deployments using Docker and CI/CD tools, monitor system health, and document runbooks. A great fit for students interested in cloud engineering, site reliability, or platform engineering careers.",
+    "job_type": "internship",
     "skills_required": ["linux", "docker", "aws", "ci/cd"],
     "salary_range": "$72k-$92k",
     "location": "Seattle, WA"
@@ -51,6 +63,8 @@
     "id": 7,
     "title": "Software Engineer I",
     "company": "CodeStream",
+    "description": "Join a team building high-performance developer tooling in Java. You will solve challenging algorithmic problems, contribute to core libraries, and participate in architecture discussions. We expect strong fundamentals in data structures, clean Git workflows, and a collaborative attitude. New grads welcome.",
+    "job_type": "full-time",
     "skills_required": ["java", "algorithms", "git", "problem solving"],
     "salary_range": "$88k-$118k",
     "location": "Denver, CO"
@@ -59,6 +73,8 @@
     "id": 8,
     "title": "API Integration Developer",
     "company": "NexaSoft",
+    "description": "Build and maintain third-party API integrations using Python. You will work with REST APIs, parse and transform JSON payloads, write SQL queries to persist integration data, and handle edge cases in a fault-tolerant way. Experience with OAuth and webhook patterns is a strong plus.",
+    "job_type": "full-time",
     "skills_required": ["python", "rest api", "json", "sql"],
     "salary_range": "$82k-$108k",
     "location": "Remote"
@@ -67,6 +83,8 @@
     "id": 9,
     "title": "Product Engineering Intern",
     "company": "UpGrid",
+    "description": "Contribute to our consumer-facing React application by building new UI features, fixing bugs, and writing JavaScript utilities. You will work in two-week sprints, use Git for version control, and demo your work to stakeholders. Strong problem-solving skills and curiosity about product decisions are valued.",
+    "job_type": "internship",
     "skills_required": ["javascript", "react", "problem solving", "git"],
     "salary_range": "$68k-$88k",
     "location": "San Diego, CA"
@@ -75,6 +93,8 @@
     "id": 10,
     "title": "Platform Engineer",
     "company": "InfraNova",
+    "description": "Manage and scale our Kubernetes-based deployment platform on AWS. You will write Python automation scripts, maintain Docker images, design cluster configurations, and ensure high availability of production services. Experience with Helm, Terraform, or Prometheus is a bonus.",
+    "job_type": "full-time",
     "skills_required": ["python", "kubernetes", "docker", "aws"],
     "salary_range": "$105k-$140k",
     "location": "New York, NY"
@@ -83,6 +103,8 @@
     "id": 11,
     "title": "Database Developer",
     "company": "QueryPoint",
+    "description": "Design, optimize, and maintain relational databases powering our SaaS platform. Responsibilities include writing complex SQL queries, building data models, tuning slow queries, and managing PostgreSQL instances. You will collaborate with backend engineers to define schemas that scale with product growth.",
+    "job_type": "full-time",
     "skills_required": ["sql", "data modeling", "postgresql", "performance tuning"],
     "salary_range": "$90k-$120k",
     "location": "Boston, MA"
@@ -91,6 +113,8 @@
     "id": 12,
     "title": "Machine Learning Platform Intern",
     "company": "ModelOps Labs",
+    "description": "Support our ML platform team in building infrastructure that helps data scientists train and deploy models at scale. You will write Python scripts, manage SQL-based experiment tracking, work with Docker containers, and maintain Linux-based compute environments. Interest in MLOps or data engineering is a strong plus.",
+    "job_type": "internship",
     "skills_required": ["python", "sql", "docker", "linux"],
     "salary_range": "$80k-$104k",
     "location": "Remote"
@@ -99,7 +123,9 @@
     "id": 13,
     "title": "Backend Developer",
     "company": "CoreStack Systems",
-    "skills_required": ["python", "sql", "rest api", "git"],
+    "description": "Build robust backend services in Python that power our enterprise SaaS platform. You will design REST API endpoints, write SQL queries, maintain Git-based workflows, and participate in sprint planning. We value clean code, thoughtful API design, and clear documentation.",
+    "job_type": "full-time",
+    "skills_required": ["python", "rest api", "sql", "git"],
     "salary_range": "$96k-$126k",
     "location": "Austin, TX"
   },
@@ -107,6 +133,8 @@
     "id": 14,
     "title": "Frontend Developer",
     "company": "PixelBridge",
+    "description": "Build and maintain modern React-based web applications with a focus on performance and accessibility. You will consume REST APIs, manage component state, use Git for collaboration, and ship features on a regular release cadence. Experience with TypeScript or testing libraries like Jest is a plus.",
+    "job_type": "full-time",
     "skills_required": ["javascript", "react", "git", "rest api"],
     "salary_range": "$88k-$116k",
     "location": "Remote"
@@ -115,6 +143,8 @@
     "id": 15,
     "title": "Full Stack Developer",
     "company": "NimbleWare",
+    "description": "Own features across a Python backend and React/Node frontend. You will write SQL migrations, build API routes, and implement UI components — all in a small team where your work ships fast. We are looking for generalists who are comfortable context-switching and learning on the fly.",
+    "job_type": "full-time",
     "skills_required": ["python", "node", "react", "sql"],
     "salary_range": "$102k-$136k",
     "location": "Denver, CO"
@@ -123,6 +153,8 @@
     "id": 16,
     "title": "Data Analyst",
     "company": "Insight Harbor",
+    "description": "Analyze product and business data to surface actionable insights for stakeholders. You will write Python scripts for data wrangling, build SQL queries for ad hoc analysis, maintain REST API data pulls, and version your work with Git. Strong communication and data storytelling skills are as important as technical ability.",
+    "job_type": "full-time",
     "skills_required": ["python", "sql", "git", "rest api"],
     "salary_range": "$84k-$110k",
     "location": "Chicago, IL"
@@ -131,6 +163,8 @@
     "id": 17,
     "title": "Data Engineer",
     "company": "StreamAxis",
+    "description": "Build streaming and batch data pipelines that ingest and transform data at scale. You will use Python-based frameworks, write SQL transformations, deploy containers with Docker, and run workloads on AWS. Experience with Apache Kafka, Spark, or dbt is a strong differentiator.",
+    "job_type": "full-time",
     "skills_required": ["python", "sql", "docker", "aws"],
     "salary_range": "$104k-$138k",
     "location": "Seattle, WA"
@@ -139,6 +173,8 @@
     "id": 18,
     "title": "QA Engineer",
     "company": "Reliant QA",
+    "description": "Ensure software quality across a multi-service web application by writing automated tests in Python and JavaScript. You will maintain REST API test suites, integrate tests into Git-based CI workflows, and work closely with developers during feature development to catch issues early.",
+    "job_type": "full-time",
     "skills_required": ["python", "javascript", "git", "rest api"],
     "salary_range": "$82k-$106k",
     "location": "Remote"
@@ -147,6 +183,8 @@
     "id": 19,
     "title": "DevOps Engineer",
     "company": "CloudForge",
+    "description": "Own the deployment and reliability of our cloud infrastructure on AWS. You will containerize services with Docker, automate infrastructure changes, write Python scripts for operational tooling, and manage Git-based infrastructure-as-code repositories. Experience with Terraform or Ansible is a strong plus.",
+    "job_type": "full-time",
     "skills_required": ["aws", "docker", "python", "git"],
     "salary_range": "$108k-$145k",
     "location": "San Francisco, CA"
@@ -155,6 +193,8 @@
     "id": 20,
     "title": "Software Engineer Intern",
     "company": "LaunchPath",
+    "description": "A generalist internship for students who want real engineering experience. You will write Python and JavaScript code, work with SQL databases, use Git for collaboration, and ship features to production. We pair every intern with a senior engineer mentor and expect you to present your work at the end of the summer.",
+    "job_type": "internship",
     "skills_required": ["python", "javascript", "git", "sql"],
     "salary_range": "$68k-$86k",
     "location": "Boston, MA"
@@ -163,6 +203,8 @@
     "id": 21,
     "title": "Backend Developer II",
     "company": "APIWorks",
+    "description": "Lead development of high-throughput REST APIs in Python serving millions of requests per day. You will write SQL queries, deploy services to AWS, design API contracts, and mentor junior engineers. We expect strong opinions on system design and a track record of shipping reliable backend services.",
+    "job_type": "full-time",
     "skills_required": ["python", "rest api", "sql", "aws"],
     "salary_range": "$110k-$142k",
     "location": "Remote"
@@ -171,6 +213,8 @@
     "id": 22,
     "title": "Frontend Developer II",
     "company": "UI Foundry",
+    "description": "Drive frontend architecture decisions for our design system and consumer web app. You will build reusable React components, write Node-based tooling, manage Git workflows across a distributed team, and collaborate with designers on interaction patterns. TypeScript experience is preferred.",
+    "job_type": "full-time",
     "skills_required": ["javascript", "react", "node", "git"],
     "salary_range": "$94k-$122k",
     "location": "Los Angeles, CA"
@@ -179,6 +223,8 @@
     "id": 23,
     "title": "Full Stack Platform Engineer",
     "company": "BridgeScale",
+    "description": "Build the internal developer platform that powers dozens of product teams. You will write Python backend services, build React-based internal tooling, containerize workloads with Docker, and work with a Node-based build system. Strong systems thinking and a bias toward automation are key to success in this role.",
+    "job_type": "full-time",
     "skills_required": ["python", "node", "react", "docker"],
     "salary_range": "$112k-$148k",
     "location": "New York, NY"
@@ -187,6 +233,8 @@
     "id": 24,
     "title": "Junior Data Analyst",
     "company": "MetricNest",
+    "description": "Support the analytics team by writing SQL queries, building Python-based data cleaning scripts, and maintaining JavaScript dashboards. You will work with Git to version your analysis notebooks and collaborate with product managers to define metrics. This is a great entry-level role for students interested in data careers.",
+    "job_type": "part-time",
     "skills_required": ["python", "sql", "javascript", "git"],
     "salary_range": "$76k-$98k",
     "location": "Phoenix, AZ"

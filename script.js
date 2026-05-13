@@ -1,55 +1,99 @@
-//////////////////////////////////////////////////////
-// BACKEND URL
-//////////////////////////////////////////////////////
-
-const API_BASE = window.__API_BASE__ || window.location.origin;
-
-//////////////////////////////////////////////////////
-// STATE
-//////////////////////////////////////////////////////
+const API_BASE = window.location.origin;
 
 let jobs = [];
 let matchResults = [];
 let selectedType = null;
-let currentSearch = "";
 let currentSort = "best";
 
 let skillTags = [];
 let courseTags = [];
 let expTags = [];
 
-//////////////////////////////////////////////////////
-// PROFILE STORAGE
-//////////////////////////////////////////////////////
+let jobSearchChips = [];
+let visibleJobsCount = 5;
+const JOBS_PAGE_INCREMENT = 5;
+
+const savedJobIdsServer = new Set();
+
+function getProgressCode() {
+  return localStorage.getItem("bridge_progress_code") || "";
+}
+
+function apiJsonHeaders() {
+  const headers = { "Content-Type": "application/json" };
+  const code = getProgressCode();
+  if (code) {
+    headers["X-Progress-Code"] = code;
+  }
+  return headers;
+}
 
 function getUserProfile() {
-  return JSON.parse(localStorage.getItem("userProfile")) || {
-    skills: [],
-    courses: [],
-    projects: [],
-    resume_text: ""
-  };
+  return (
+    JSON.parse(localStorage.getItem("userProfile")) || {
+      skills: [],
+      courses: [],
+      projects: [],
+      resume_text: "",
+    }
+  );
 }
 
 function saveUserProfile(profile) {
   localStorage.setItem("userProfile", JSON.stringify(profile));
 }
 
-//////////////////////////////////////////////////////
-// HELPERS
-//////////////////////////////////////////////////////
-
 function updateSavedCount() {
   const saved = JSON.parse(localStorage.getItem("savedJobs")) || [];
   document.getElementById("savedJobsCount").textContent = saved.length;
 }
 
-//////////////////////////////////////////////////////
-// TAG BUBBLE SYSTEM (COMMA SUPPORT)
-//////////////////////////////////////////////////////
+function truncateText(text, maxLen) {
+  const s = String(text || "");
+  if (s.length <= maxLen) {
+    return s;
+  }
+  return `${s.slice(0, maxLen)}…`;
+}
+
+function normalizeTypeLabel(s) {
+  return String(s || "")
+    .toLowerCase()
+    .replace(/[\s_]+/g, "-");
+}
+
+function jobMatchesSelectedType(job) {
+  if (!selectedType) {
+    return true;
+  }
+  return normalizeTypeLabel(job.job_type) === normalizeTypeLabel(selectedType);
+}
+
+async function fetchSavedJobIdsFromServer() {
+  savedJobIdsServer.clear();
+  const code = getProgressCode();
+  if (!code) {
+    return;
+  }
+  try {
+    const response = await fetch(`${API_BASE}/saved-jobs`, {
+      headers: { "X-Progress-Code": code },
+    });
+    if (!response.ok) {
+      return;
+    }
+    const data = await response.json();
+    (data.job_ids || []).forEach((id) => savedJobIdsServer.add(id));
+  } catch (error) {
+    console.error("saved-jobs fetch failed", error);
+  }
+}
 
 function renderTagBubbles(containerId, listRef) {
   const container = document.getElementById(containerId);
+  if (!container) {
+    return;
+  }
   container.innerHTML = "";
 
   listRef.forEach((tag, index) => {
@@ -70,14 +114,17 @@ function renderTagBubbles(containerId, listRef) {
   });
 }
 
-function setupBubbleInput(inputId, containerId, listRef) {
+function setupBubbleInput(inputId, containerId, listRef, onChange) {
   const input = document.getElementById(inputId);
+  if (!input) {
+    return;
+  }
 
   input.addEventListener("input", () => {
     if (input.value.includes(",")) {
       const parts = input.value.split(",");
 
-      parts.slice(0, -1).forEach(part => {
+      parts.slice(0, -1).forEach((part) => {
         const value = part.trim();
         if (value && !listRef.includes(value)) {
           listRef.push(value);
@@ -86,6 +133,9 @@ function setupBubbleInput(inputId, containerId, listRef) {
 
       input.value = parts[parts.length - 1].trim();
       renderTagBubbles(containerId, listRef);
+      if (onChange) {
+        onChange();
+      }
     }
   });
 
@@ -94,7 +144,9 @@ function setupBubbleInput(inputId, containerId, listRef) {
       e.preventDefault();
 
       const value = input.value.trim();
-      if (!value) return;
+      if (!value) {
+        return;
+      }
 
       if (!listRef.includes(value)) {
         listRef.push(value);
@@ -102,22 +154,33 @@ function setupBubbleInput(inputId, containerId, listRef) {
 
       input.value = "";
       renderTagBubbles(containerId, listRef);
+      if (onChange) {
+        onChange();
+      }
     }
 
     if (e.key === "Backspace" && input.value.trim() === "" && listRef.length > 0) {
       listRef.pop();
       renderTagBubbles(containerId, listRef);
+      if (onChange) {
+        onChange();
+      }
     }
   });
 }
 
-//////////////////////////////////////////////////////
-// FETCH JOBS
-//////////////////////////////////////////////////////
+function resetVisibleJobs() {
+  visibleJobsCount = JOBS_PAGE_INCREMENT;
+}
 
 async function fetchJobs() {
   try {
-    const response = await fetch(`${API_BASE}/jobs`);
+    const headers = {};
+    const code = getProgressCode();
+    if (code) {
+      headers["X-Progress-Code"] = code;
+    }
+    const response = await fetch(`${API_BASE}/jobs?limit=5000`, { headers });
     const data = await response.json();
     jobs = data.jobs || [];
     document.getElementById("totalJobsCount").textContent = jobs.length;
@@ -126,42 +189,69 @@ async function fetchJobs() {
   }
 }
 
-//////////////////////////////////////////////////////
-// FETCH MATCHES
-//////////////////////////////////////////////////////
-
-async function fetchMatches(skills, courses, resumeText) {
+async function fetchMatches(skills, courses, projects, resumeText) {
   try {
     const response = await fetch(`${API_BASE}/match`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: apiJsonHeaders(),
       body: JSON.stringify({
         skills,
         courses,
-        projects: [],
-        resume_text: resumeText.trim() || ""
-      })
+        projects,
+        resume_text: (resumeText || "").trim(),
+      }),
     });
 
     const data = await response.json();
     return data.matches || [];
-
   } catch (error) {
     console.error("Error fetching matches:", error);
     return [];
   }
 }
 
-//////////////////////////////////////////////////////
-// SAVE + COMPARE
-//////////////////////////////////////////////////////
+function jobHaystack(item) {
+  return [
+    item.title,
+    item.company,
+    item.location || "",
+    item.description || "",
+    item.job_type || "",
+    (item.skills_required || []).join(" "),
+  ]
+    .join(" ")
+    .toLowerCase();
+}
 
-function saveJob(job) {
+function isJobSavedLocally(job) {
+  const saved = JSON.parse(localStorage.getItem("savedJobs")) || [];
+  return saved.some((j) => j.id === job.id);
+}
+
+function isJobSaved(job) {
+  return savedJobIdsServer.has(job.id) || isJobSavedLocally(job);
+}
+
+async function saveJob(job) {
+  const code = getProgressCode();
+  if (code) {
+    try {
+      const response = await fetch(`${API_BASE}/saved-jobs`, {
+        method: "POST",
+        headers: apiJsonHeaders(),
+        body: JSON.stringify({ job_id: job.id }),
+      });
+      if (response.status === 204) {
+        savedJobIdsServer.add(job.id);
+      }
+    } catch (error) {
+      console.error("save job server failed", error);
+    }
+  }
+
   let saved = JSON.parse(localStorage.getItem("savedJobs")) || [];
 
-  if (!saved.find(j => j.id === job.id)) {
+  if (!saved.find((j) => j.id === job.id)) {
     saved.push(job);
     localStorage.setItem("savedJobs", JSON.stringify(saved));
   }
@@ -172,48 +262,38 @@ function saveJob(job) {
 function compareJob(job) {
   let compare = JSON.parse(localStorage.getItem("compareJobs")) || [];
 
-  if (!compare.find(j => j.id === job.id)) {
+  if (!compare.find((j) => j.id === job.id)) {
     compare.push(job);
     localStorage.setItem("compareJobs", JSON.stringify(compare));
     alert("Added to Compare!");
   }
 }
 
-//////////////////////////////////////////////////////
-// APPLY FILTERS + SORT
-//////////////////////////////////////////////////////
-
 function applyFilters(list) {
   let filtered = [...list];
 
-  // SEARCH
-  if (currentSearch) {
-    filtered = filtered.filter(item =>
-      item.title.toLowerCase().includes(currentSearch.toLowerCase()) ||
-      item.company.toLowerCase().includes(currentSearch.toLowerCase())
-    );
+  if (jobSearchChips.length) {
+    filtered = filtered.filter((item) => {
+      const hay = jobHaystack(item);
+      return jobSearchChips.every((chip) => hay.includes(String(chip).toLowerCase()));
+    });
   }
 
-  // FILTER BY TYPE
   if (selectedType) {
-    filtered = filtered.filter(item => item.type === selectedType);
+    filtered = filtered.filter((item) => jobMatchesSelectedType(item));
   }
 
-  // LOCATION FILTER
   const locInput = document.getElementById("locationInput").value.trim();
   if (locInput) {
-    filtered = filtered.filter(item =>
-      (item.location || "").toLowerCase().includes(locInput.toLowerCase())
-    );
+    filtered = filtered.filter((item) => (item.location || "").toLowerCase().includes(locInput.toLowerCase()));
   }
 
-  // SORTING
   if (currentSort === "best") {
     filtered.sort((a, b) => (b.match_score || 0) - (a.match_score || 0));
   }
 
   if (currentSort === "newest") {
-    filtered.sort((a, b) => new Date(b.postedDate) - new Date(a.postedDate));
+    filtered.sort((a, b) => new Date(b.postedDate || 0) - new Date(a.postedDate || 0));
   }
 
   if (currentSort === "az") {
@@ -227,10 +307,6 @@ function applyFilters(list) {
   return filtered;
 }
 
-//////////////////////////////////////////////////////
-// RENDER AI RECOMMENDATIONS
-//////////////////////////////////////////////////////
-
 function renderRecommendations() {
   const container = document.getElementById("recommendedJobs");
   container.innerHTML = "";
@@ -243,7 +319,7 @@ function renderRecommendations() {
     return;
   }
 
-  top3.forEach(match => {
+  top3.forEach((match) => {
     const card = document.createElement("div");
     card.className = "recommended-card";
 
@@ -259,41 +335,49 @@ function renderRecommendations() {
   });
 }
 
-//////////////////////////////////////////////////////
-// RENDER JOB LIST
-//////////////////////////////////////////////////////
-
 function displayJobs() {
   const container = document.getElementById("jobList");
+  const loadBtn = document.getElementById("loadMoreJobs");
   container.innerHTML = "";
 
-  let combined = jobs.map(job => {
-    const match = matchResults.find(m => m.job_id === job.id);
+  let combined = jobs.map((job) => {
+    const match = matchResults.find((m) => m.job_id === job.id);
 
     return {
       ...job,
       match_score: match ? match.match_score : 0,
       matched_skills: match ? match.matched_skills : [],
       missing_skills: match ? match.missing_skills : [],
-      explanation: match ? match.explanation : "No match data yet."
+      explanation: match ? match.explanation : "No match data yet.",
     };
   });
 
   combined = applyFilters(combined);
+  const total = combined.length;
+  const slice = combined.slice(0, visibleJobsCount);
 
-  document.getElementById("resultsCount").textContent = `${combined.length} results`;
+  document.getElementById("resultsCount").textContent = `${slice.length} of ${total} results`;
 
-  combined.forEach(job => {
+  if (loadBtn) {
+    loadBtn.style.display = visibleJobsCount >= total ? "none" : "inline-block";
+  }
+
+  slice.forEach((job) => {
     const card = document.createElement("div");
     card.className = "job-card";
 
     card.addEventListener("click", () => openJobModal(job.id));
+
+    const descSnippet = truncateText(job.description || "", 150);
+    const jt = job.job_type || "—";
+    const savedLabel = isJobSaved(job) ? "Saved ✓" : "Save";
 
     card.innerHTML = `
       <div style="display:flex;justify-content:space-between;">
         <div>
           <div class="job-title">${job.title}</div>
           <div class="job-company">${job.company} • ${job.location || "Location not listed"}</div>
+          <div style="margin-top:6px;"><span class="tag" style="background:#ede7f6;color:#4a148c;">${jt}</span></div>
         </div>
 
         <div style="text-align:right;">
@@ -304,8 +388,13 @@ function displayJobs() {
         </div>
       </div>
 
+      <p style="margin-top:8px;font-size:0.88rem;color:#333;line-height:1.35;">${descSnippet}</p>
+
       <div class="job-meta">
-        ${(job.skills_required || []).slice(0, 4).map(s => `<span class="tag">${s}</span>`).join("")}
+        ${(job.skills_required || [])
+          .slice(0, 4)
+          .map((s) => `<span class="tag">${s}</span>`)
+          .join("")}
       </div>
 
       <p style="margin-top:10px;font-size:0.85rem;color:#444;">
@@ -313,14 +402,16 @@ function displayJobs() {
       </p>
 
       <div class="job-actions">
-        <button class="save-btn">Save</button>
+        <button class="save-btn">${savedLabel}</button>
         <button class="compare-btn">Compare</button>
       </div>
     `;
 
-    card.querySelector(".save-btn").addEventListener("click", (e) => {
+    const saveBtn = card.querySelector(".save-btn");
+    saveBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       saveJob(job);
+      displayJobs();
     });
 
     card.querySelector(".compare-btn").addEventListener("click", (e) => {
@@ -332,35 +423,34 @@ function displayJobs() {
   });
 }
 
-//////////////////////////////////////////////////////
-// JOB MODAL (UPDATED: WHY THIS JOB + APPLY LINK)
-//////////////////////////////////////////////////////
-
 function openJobModal(jobId) {
   const modal = document.getElementById("jobModal");
   const details = document.getElementById("jobDetails");
 
-  const job = jobs.find(j => j.id === jobId);
-  const match = matchResults.find(m => m.job_id === jobId);
+  const job = jobs.find((j) => j.id === jobId);
+  const match = matchResults.find((m) => m.job_id === jobId);
 
-  if (!job) return;
+  if (!job) {
+    return;
+  }
 
   const matchScore = match ? match.match_score : 0;
   const matchedSkills = match ? match.matched_skills : [];
   const missingSkills = match ? match.missing_skills : [];
   const explanation = match ? match.explanation : "No match data available.";
 
-  // Breakdown estimate (visual only)
   const skillScore = Math.min(70, matchScore);
   const courseScore = Math.min(20, Math.max(0, matchScore - 50));
   const resumeScore = Math.min(10, Math.max(0, matchScore - 80));
 
-  // TEMP APPLY LINK (for now)
   const applyLink = job.apply_link || "https://example.com/apply";
+  const descBlock = job.description ? `<p style="margin:10px 0;color:#333;">${job.description}</p>` : "";
 
   details.innerHTML = `
     <h2>${job.title}</h2>
     <p><strong>${job.company}</strong> • ${job.location || "Location not listed"}</p>
+    <p><span class="tag">${job.job_type || "Job type"}</span></p>
+    ${descBlock}
 
     <div style="margin:10px 0;">
       <span class="tag">${job.salary_range || "Salary not listed"}</span>
@@ -397,7 +487,7 @@ function openJobModal(jobId) {
 
     <h3>Required Skills</h3>
     <ul>
-      ${(job.skills_required || []).map(s => `<li>${s}</li>`).join("")}
+      ${(job.skills_required || []).map((s) => `<li>${s}</li>`).join("")}
     </ul>
 
     <a class="apply-btn" href="${applyLink}" target="_blank">
@@ -412,10 +502,6 @@ document.getElementById("closeModal").addEventListener("click", () => {
   document.getElementById("jobModal").classList.add("hidden");
 });
 
-//////////////////////////////////////////////////////
-// FILTER BUTTONS
-//////////////////////////////////////////////////////
-
 document.getElementById("filterBtn").addEventListener("click", async () => {
   const profile = getUserProfile();
 
@@ -425,8 +511,8 @@ document.getElementById("filterBtn").addEventListener("click", async () => {
 
   saveUserProfile(profile);
 
-  matchResults = await fetchMatches(profile.skills, profile.courses, profile.resume_text || "");
-
+  matchResults = await fetchMatches(skillTags, courseTags, expTags, profile.resume_text || "");
+  resetVisibleJobs();
   renderRecommendations();
   displayJobs();
 });
@@ -443,51 +529,52 @@ document.getElementById("clearBtn").addEventListener("click", async () => {
   document.getElementById("locationInput").value = "";
 
   selectedType = null;
-  document.querySelectorAll(".bubble").forEach(b => b.classList.remove("active-bubble"));
+  document.querySelectorAll(".bubble").forEach((b) => b.classList.remove("active-bubble"));
 
   saveUserProfile({ skills: [], courses: [], projects: [], resume_text: "" });
 
-  matchResults = await fetchMatches([], [], "");
-
+  matchResults = await fetchMatches([], [], [], "");
+  resetVisibleJobs();
   renderRecommendations();
   displayJobs();
 });
 
-//////////////////////////////////////////////////////
-// JOB TYPE BUBBLES
-//////////////////////////////////////////////////////
-
-document.querySelectorAll(".bubble").forEach(btn => {
+document.querySelectorAll(".bubble").forEach((btn) => {
   btn.addEventListener("click", () => {
     selectedType = btn.dataset.type;
 
-    document.querySelectorAll(".bubble").forEach(b => b.classList.remove("active-bubble"));
+    document.querySelectorAll(".bubble").forEach((b) => b.classList.remove("active-bubble"));
     btn.classList.add("active-bubble");
 
+    resetVisibleJobs();
     displayJobs();
   });
 });
 
-//////////////////////////////////////////////////////
-// SEARCH + SORT
-//////////////////////////////////////////////////////
-
-document.getElementById("searchBar").addEventListener("input", (e) => {
-  currentSearch = e.target.value;
-  displayJobs();
-});
-
 document.getElementById("sortSelect").addEventListener("change", (e) => {
   currentSort = e.target.value;
+  resetVisibleJobs();
   displayJobs();
 });
 
-//////////////////////////////////////////////////////
-// INIT
-//////////////////////////////////////////////////////
+const loadMoreBtn = document.getElementById("loadMoreJobs");
+if (loadMoreBtn) {
+  loadMoreBtn.addEventListener("click", () => {
+    visibleJobsCount += JOBS_PAGE_INCREMENT;
+    displayJobs();
+  });
+}
+
+function onJobSearchChipsChanged() {
+  resetVisibleJobs();
+  displayJobs();
+}
+
+setupBubbleInput("jobSearchChipInput", "jobSearchChipBubbles", jobSearchChips, onJobSearchChipsChanged);
 
 async function init() {
   updateSavedCount();
+  await fetchSavedJobIdsFromServer();
 
   setupBubbleInput("skillsInput", "skillsBubbles", skillTags);
   setupBubbleInput("courseworkInput", "courseworkBubbles", courseTags);
@@ -505,7 +592,7 @@ async function init() {
   renderTagBubbles("courseworkBubbles", courseTags);
   renderTagBubbles("experienceBubbles", expTags);
 
-  matchResults = await fetchMatches(profile.skills, profile.courses, profile.resume_text || "");
+  matchResults = await fetchMatches(skillTags, courseTags, expTags, profile.resume_text || "");
 
   renderRecommendations();
   displayJobs();

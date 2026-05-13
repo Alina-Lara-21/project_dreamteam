@@ -24,9 +24,9 @@
 
 <div class="layout">
 
-  <!-- SIDEBAR FILTERS -->
+  <!-- SIDEBAR: match inputs -->
   <aside class="sidebar">
-    <h2>Filters</h2>
+    <h2>Match profile</h2>
 
     <div class="filter-group">
       <label>Skills</label>
@@ -109,7 +109,10 @@
       </div>
 
       <div class="top-controls">
-        <input id="searchBar" placeholder="Search job titles...">
+        <div style="flex:1;min-width:200px;">
+          <input id="jobSearchChipInput" placeholder="Search jobs — Enter or comma for chips">
+          <div id="jobSearchChipBubbles" class="input-bubbles" style="margin-top:6px;"></div>
+        </div>
 
         <select id="sortSelect">
           <option value="best">Best Match</option>
@@ -122,6 +125,9 @@
 
     <!-- JOB LIST -->
     <div id="jobList"></div>
+    <div style="text-align:center;margin:16px 0;">
+      <button type="button" class="secondary" id="loadMoreJobs">Load more</button>
+    </div>
 
   </section>
 

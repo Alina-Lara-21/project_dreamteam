@@ -3,6 +3,7 @@ from app_db.database import Base, engine
 import app_db.models  # noqa: F401 — registers ORM tables on Base.metadata for create_all
 
 from routers.progress_session import router as progress_router
+from routers.user_profile import router as profile_router
 from routers.user_profile_preferences import router as profile_prefs_router
 from routers.user_saved_jobs import router as saved_jobs_router
 from routers.user_progress_state import router as progress_state_router
@@ -42,6 +43,7 @@ from models import (
     Job,
     JobsResponse,
     MatchResponse,
+    MatchResult,
     ResumeGenerateResponse,
     SkillGapItem,
     SkillGapResponse,
@@ -56,7 +58,7 @@ from services.jobs_mongo import (
     jobs_collection,
     count_jobs,
 )
-from services.matcher import match_jobs
+from services.matcher import match_jobs, query_token_overlap_count
 from services.profile_preferences import load_preferences_map, merge_job_filters, merge_user_profile
 from services.skill_mapper import normalize_many
 
@@ -158,13 +160,14 @@ app.add_middleware(
 )
 
 app.include_router(progress_router)
+app.include_router(profile_router)
 app.include_router(profile_prefs_router)
 app.include_router(saved_jobs_router)
 app.include_router(progress_state_router)
 
 
 DATA_FILE = Path(__file__).with_name("data") / "jobs.json"
-MIN_JOBS_FOR_DEMO = 2000
+MIN_JOBS_FOR_DEMO = 24
 
 
 def _expand_jobs_for_demo(jobs: list[Job], minimum_count: int = MIN_JOBS_FOR_DEMO) -> list[Job]:
@@ -228,6 +231,8 @@ def get_filtered_jobs(
                     job.title.lower(),
                     job.company.lower(),
                     (job.location or "").lower(),
+                    (job.description or "").lower(),
+                    (job.job_type or "").lower(),
                     " ".join(normalize_many(job.skills_required)),
                 ]
             )
@@ -559,23 +564,31 @@ async def ai_search(
 ) -> AiSearchResponse:
     prefs = load_preferences_map(db, learner.id) if learner else {}
     profile = UserProfile(
-        skills=body.skills,
-        courses=body.courses,
-        projects=body.projects,
-        resume_text=body.resume_text,
+        skills=body.skills if body.use_skills else [],
+        courses=body.courses if body.use_courses else [],
+        projects=body.projects if body.use_projects else [],
+        resume_text=body.resume_text if body.use_resume_text else None,
     )
     effective = merge_user_profile(prefs, profile) if (learner and apply_saved_profile) else profile
 
     jobs_pool = await load_jobs_for_match(request)
     q = (body.query or "").strip().lower()
-    if q:
-        text_filtered = [job for job in jobs_pool if q in _job_text_blob(job)]
+    tokens = [t for t in q.split() if t]
+    if tokens:
+        text_filtered = [job for job in jobs_pool if all(t in _job_text_blob(job) for t in tokens)]
     else:
         text_filtered = list(jobs_pool)
 
     ranked = match_jobs(effective, text_filtered)
-    top = ranked[: body.limit]
     by_id = {job.id: job for job in text_filtered}
+
+    def _ai_rank_key(m: MatchResult) -> tuple[int, int, str]:
+        job = by_id.get(m.job_id)
+        overlap = query_token_overlap_count(job, tokens) if job is not None else 0
+        return (-m.match_score, -overlap, m.title.lower())
+
+    ranked_sorted = sorted(ranked, key=_ai_rank_key)
+    top = ranked_sorted[: body.limit]
     jobs_out = [by_id[m.job_id] for m in top if m.job_id in by_id]
     logger.info(
         "POST /ai/search source=%s query_len=%s candidate_jobs=%s returned_jobs=%s",

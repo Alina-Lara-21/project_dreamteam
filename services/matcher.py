@@ -2,6 +2,30 @@ from models import Job, MatchResult, UserProfile
 from services.skill_mapper import build_user_skill_pool, normalize_many
 
 
+def build_job_text(job: Job) -> str:
+    loc = getattr(job, "location", None) or ""
+    desc = getattr(job, "description", "") or ""
+    jt = getattr(job, "job_type", None) or ""
+    req = getattr(job, "requirements", None) or ""
+    parts = [
+        job.title,
+        job.company,
+        str(loc),
+        str(jt),
+        str(desc),
+        str(req),
+        " ".join(normalize_many(job.skills_required)),
+    ]
+    return " ".join(str(p) for p in parts).lower()
+
+
+def query_token_overlap_count(job: Job | None, tokens: list[str]) -> int:
+    if job is None or not tokens:
+        return 0
+    hay = build_job_text(job)
+    return sum(1 for t in tokens if t and t in hay)
+
+
 def _build_explanation(
     matched_skills: list[str],
     courses: list[str],

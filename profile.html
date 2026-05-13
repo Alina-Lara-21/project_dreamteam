@@ -34,6 +34,7 @@
         <p class="profile-subtext">
           Save your skills and preferences so JobFinder can automatically match jobs.
         </p>
+        <p id="profileSaveStatus" class="profile-subtext" style="min-height:1.25em;color:#2e7d32;"></p>
 
         <div class="profile-progress">
           <div class="progress-label">
@@ -88,7 +89,9 @@
     <div class="profile-grid">
       <div class="filter-group">
         <label>Skills</label>
-        <input id="profileSkills" placeholder="Python, JavaScript, SQL">
+        <input type="hidden" id="profileSkillsHidden" value="">
+        <input id="profileSkillInput" placeholder="Add a skill, press Enter or comma">
+        <div id="profileSkillBubbles" class="input-bubbles"></div>
       </div>
 
       <div class="filter-group">
@@ -120,10 +123,10 @@
 
     <div class="resume-box">
       <p class="resume-text">
-        Upload your resume in <strong>.txt</strong> format. JobFinder will scan it and extract skills automatically.
+        Upload your resume as <strong>PDF</strong> or <strong>.txt</strong>. We extract skills from the text.
       </p>
 
-      <input type="file" id="resumeUpload" accept=".txt" class="resume-upload">
+      <input type="file" id="resumeUpload" accept="application/pdf,.txt,text/plain" class="resume-upload">
 
       <textarea id="resumePreview"
         class="resume-preview"

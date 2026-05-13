@@ -49,3 +49,19 @@ class ProfilePreferencesPut(BaseModel):
 
 class ProfilePreferencesPatchBody(BaseModel):
     preferences: dict[str, Any]
+
+
+class ProfileSave(BaseModel):
+    full_name: str = ""
+    email: str = ""
+    skills: str = ""
+    coursework: str = ""
+    experience: str = ""
+    location: str = ""
+    job_types: str = ""
+    resume_text: str = ""
+
+
+class ProfileResponse(ProfileSave):
+    user_id: str
+    updated_at: str
