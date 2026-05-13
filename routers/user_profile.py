@@ -25,6 +25,8 @@ def _empty_profile(user_id: str) -> ProfileResponse:
         location="",
         job_types="",
         resume_text="",
+        experience_entries_json="[]",
+        education_json="[]",
     )
 
 
@@ -40,6 +42,8 @@ def _to_response(row: UserProfileRow) -> ProfileResponse:
         location=row.location or "",
         job_types=row.job_types or "",
         resume_text=row.resume_text or "",
+        experience_entries_json=getattr(row, "experience_entries_json", None) or "[]",
+        education_json=getattr(row, "education_json", None) or "[]",
     )
 
 
@@ -77,6 +81,8 @@ def save_profile_data(
     row.location = payload.location
     row.job_types = payload.job_types
     row.resume_text = payload.resume_text
+    row.experience_entries_json = payload.experience_entries_json or "[]"
+    row.education_json = payload.education_json or "[]"
     row.updated_at = datetime.now(timezone.utc).isoformat()
 
     db.commit()

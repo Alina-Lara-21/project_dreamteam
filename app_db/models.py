@@ -58,4 +58,6 @@ class UserProfile(Base):
     location = Column(String, default="")
     job_types = Column(String, default="")
     resume_text = Column(Text, default="")
+    experience_entries_json = Column(Text, default="")
+    education_json = Column(Text, default="")
     updated_at = Column(String, default="")

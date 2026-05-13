@@ -1,15 +1,66 @@
 const API_BASE = window.location.origin;
 
+const JOB_CATEGORIES = [
+  {
+    id: "ai",
+    label: "AI & Machine Learning",
+    keys: ["machine learning", "deep learning", "llm", "nlp", "tensorflow", "pytorch", "neural net", "computer vision", " ai ", "ml "],
+  },
+  {
+    id: "data",
+    label: "Data & Analytics",
+    keys: ["data analyst", "data engineer", "analytics", "business intelligence", "sql", "warehouse", "etl", "tableau", "power bi"],
+  },
+  {
+    id: "pm",
+    label: "Project Management",
+    keys: ["project manager", "program manager", "scrum", "agile", "pmp", "delivery manager"],
+  },
+  {
+    id: "ops",
+    label: "Operations & Support",
+    keys: ["operations", "customer support", "help desk", "technical support", "service desk", "it support"],
+  },
+  {
+    id: "sw",
+    label: "Software Development",
+    keys: ["software engineer", "developer", "backend", "frontend", "full stack", "devops", "sre", "java", "python", "react", "node"],
+  },
+  {
+    id: "ux",
+    label: "Design & UX",
+    keys: ["ux", "ui ", "product design", "figma", "graphic design", "designer"],
+  },
+  {
+    id: "mkt",
+    label: "Marketing",
+    keys: ["marketing", "seo", "content", "social media", "growth", "brand"],
+  },
+  {
+    id: "fin",
+    label: "Finance",
+    keys: ["finance", "accounting", "financial", "controller", "fp&a", "audit"],
+  },
+  {
+    id: "sales",
+    label: "Sales",
+    keys: ["sales", "account executive", "business development", "bdr", "sdr"],
+  },
+  {
+    id: "it",
+    label: "IT",
+    keys: ["network", "sysadmin", "systems administrator", "infrastructure", "cybersecurity", "security engineer"],
+  },
+];
+
 let jobs = [];
 let matchResults = [];
 let selectedType = null;
 let currentSort = "best";
 
-let skillTags = [];
-let courseTags = [];
-let expTags = [];
+let jobTitleTags = [];
+const selectedCategoryLabels = new Set();
 
-let jobSearchChips = [];
 let visibleJobsCount = 5;
 const JOBS_PAGE_INCREMENT = 5;
 
@@ -43,17 +94,24 @@ function saveUserProfile(profile) {
   localStorage.setItem("userProfile", JSON.stringify(profile));
 }
 
+function parseCsvSkills(s) {
+  return String(s || "")
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean);
+}
+
 function updateSavedCount() {
   const saved = JSON.parse(localStorage.getItem("savedJobs")) || [];
   document.getElementById("savedJobsCount").textContent = saved.length;
 }
 
 function truncateText(text, maxLen) {
-  const s = String(text || "");
-  if (s.length <= maxLen) {
-    return s;
+  const str = String(text || "");
+  if (str.length <= maxLen) {
+    return str;
   }
-  return `${s.slice(0, maxLen)}…`;
+  return `${str.slice(0, maxLen)}…`;
 }
 
 function normalizeTypeLabel(s) {
@@ -189,16 +247,79 @@ async function fetchJobs() {
   }
 }
 
-async function fetchMatches(skills, courses, projects, resumeText) {
+async function buildMatchProfileBody() {
+  const local = getUserProfile();
+  const code = getProgressCode();
+  if (!code) {
+    return {
+      skills: local.skills || [],
+      courses: local.courses || [],
+      projects: local.projects || [],
+      resume_text: (local.resume_text || "").trim(),
+    };
+  }
   try {
+    const r = await fetch(`${API_BASE}/profile/data`, {
+      headers: { "X-Progress-Code": code },
+    });
+    if (!r.ok) {
+      throw new Error("profile fetch failed");
+    }
+    const d = await r.json();
+    const skills = parseCsvSkills(d.skills);
+    const projects = [];
+    try {
+      const ex = JSON.parse(d.experience_entries_json || "[]");
+      if (Array.isArray(ex)) {
+        ex.forEach((e) => {
+          if (e && e.title) projects.push(String(e.title));
+          if (e && e.description) projects.push(String(e.description));
+        });
+      }
+    } catch (_) {
+      /* ignore */
+    }
+    let eduBlob = "";
+    try {
+      const ed = JSON.parse(d.education_json || "[]");
+      if (Array.isArray(ed)) {
+        ed.forEach((row) => {
+          if (row && typeof row === "object") {
+            eduBlob += ` ${row.school || row.program || row.course || ""}`;
+          }
+        });
+      }
+    } catch (_) {
+      /* ignore */
+    }
+    const resume_text = [d.resume_text || "", eduBlob].filter((x) => String(x).trim()).join(" ").trim();
+    return {
+      skills: skills.length ? skills : local.skills || [],
+      courses: (d.coursework && parseCsvSkills(d.coursework)) || local.courses || [],
+      projects: projects.length ? projects : local.projects || [],
+      resume_text: resume_text || (local.resume_text || "").trim(),
+    };
+  } catch {
+    return {
+      skills: local.skills || [],
+      courses: local.courses || [],
+      projects: local.projects || [],
+      resume_text: (local.resume_text || "").trim(),
+    };
+  }
+}
+
+async function fetchMatchesFromProfile() {
+  try {
+    const body = await buildMatchProfileBody();
     const response = await fetch(`${API_BASE}/match`, {
       method: "POST",
       headers: apiJsonHeaders(),
       body: JSON.stringify({
-        skills,
-        courses,
-        projects,
-        resume_text: (resumeText || "").trim(),
+        skills: body.skills,
+        courses: body.courses,
+        projects: body.projects,
+        resume_text: body.resume_text,
       }),
     });
 
@@ -221,6 +342,45 @@ function jobHaystack(item) {
   ]
     .join(" ")
     .toLowerCase();
+}
+
+function inferJobCategoryLabels(job) {
+  const hay = jobHaystack(job);
+  const out = new Set();
+  for (const c of JOB_CATEGORIES) {
+    const lab = c.label.toLowerCase();
+    if (hay.includes(lab)) {
+      out.add(c.label);
+    }
+    for (const k of c.keys) {
+      if (hay.includes(k)) {
+        out.add(c.label);
+        break;
+      }
+    }
+  }
+  return [...out];
+}
+
+function jobMatchesSelectedCategories(job) {
+  if (selectedCategoryLabels.size === 0) {
+    return true;
+  }
+  const inferred = inferJobCategoryLabels(job);
+  const hay = jobHaystack(job);
+  for (const sel of selectedCategoryLabels) {
+    if (inferred.includes(sel)) {
+      return true;
+    }
+    const words = sel
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((w) => w.length > 2);
+    if (words.length && words.every((w) => hay.includes(w))) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function isJobSavedLocally(job) {
@@ -272,12 +432,14 @@ function compareJob(job) {
 function applyFilters(list) {
   let filtered = [...list];
 
-  if (jobSearchChips.length) {
+  if (jobTitleTags.length) {
     filtered = filtered.filter((item) => {
       const hay = jobHaystack(item);
-      return jobSearchChips.every((chip) => hay.includes(String(chip).toLowerCase()));
+      return jobTitleTags.every((chip) => hay.includes(String(chip).toLowerCase()));
     });
   }
+
+  filtered = filtered.filter((item) => jobMatchesSelectedCategories(item));
 
   if (selectedType) {
     filtered = filtered.filter((item) => jobMatchesSelectedType(item));
@@ -315,7 +477,7 @@ function renderRecommendations() {
   const top3 = ranked.slice(0, 3);
 
   if (top3.length === 0) {
-    container.innerHTML = `<p style="color:#555;">Enter skills or upload resume in Profile to see AI matches.</p>`;
+    container.innerHTML = `<p style="color:#555;">Add skills and experience on your Profile to see stronger AI matches.</p>`;
     return;
   }
 
@@ -440,8 +602,8 @@ function openJobModal(jobId) {
   const explanation = match ? match.explanation : "No match data available.";
 
   const skillScore = Math.min(70, matchScore);
-  const courseScore = Math.min(20, Math.max(0, matchScore - 50));
-  const resumeScore = Math.min(10, Math.max(0, matchScore - 80));
+  const profileScore = Math.min(20, Math.max(0, matchScore - 50));
+  const keywordScore = Math.min(10, Math.max(0, matchScore - 80));
 
   const applyLink = job.apply_link || "https://example.com/apply";
   const descBlock = job.description ? `<p style="margin:10px 0;color:#333;">${job.description}</p>` : "";
@@ -465,16 +627,16 @@ function openJobModal(jobId) {
 
       <div class="breakdown-grid">
         <div class="breakdown-box">
-          <h5>Skills Match</h5>
+          <h5>Required skills fit</h5>
           <span>${skillScore}%</span>
         </div>
         <div class="breakdown-box">
-          <h5>Coursework Match</h5>
-          <span>${courseScore}%</span>
+          <h5>Profile and text</h5>
+          <span>${profileScore}%</span>
         </div>
         <div class="breakdown-box">
-          <h5>Resume Keywords</h5>
-          <span>${resumeScore}%</span>
+          <h5>Keyword overlap</h5>
+          <span>${keywordScore}%</span>
         </div>
       </div>
     </div>
@@ -502,38 +664,102 @@ document.getElementById("closeModal").addEventListener("click", () => {
   document.getElementById("jobModal").classList.add("hidden");
 });
 
+function persistJobFilters() {
+  try {
+    localStorage.setItem("bridge_job_title_tags", JSON.stringify(jobTitleTags));
+    localStorage.setItem("bridge_job_categories", JSON.stringify([...selectedCategoryLabels]));
+  } catch (_) {
+    /* ignore */
+  }
+}
+
+function loadJobFilterPrefs() {
+  try {
+    const t = JSON.parse(localStorage.getItem("bridge_job_title_tags") || "[]");
+    if (Array.isArray(t)) {
+      jobTitleTags.length = 0;
+      t.forEach((x) => {
+        const v = String(x).trim();
+        if (v && !jobTitleTags.includes(v)) {
+          jobTitleTags.push(v);
+        }
+      });
+    }
+  } catch (_) {
+    /* ignore */
+  }
+  try {
+    const c = JSON.parse(localStorage.getItem("bridge_job_categories") || "[]");
+    if (Array.isArray(c)) {
+      selectedCategoryLabels.clear();
+      c.forEach((x) => {
+        const v = String(x).trim();
+        if (v) {
+          selectedCategoryLabels.add(v);
+        }
+      });
+    }
+  } catch (_) {
+    /* ignore */
+  }
+}
+
+function buildCategoryCheckboxes() {
+  const host = document.getElementById("jobCategoryChecks");
+  if (!host) {
+    return;
+  }
+  host.innerHTML = "";
+  JOB_CATEGORIES.forEach((c) => {
+    const row = document.createElement("label");
+    row.className = "job-cat-row";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.value = c.label;
+    cb.checked = selectedCategoryLabels.has(c.label);
+    cb.addEventListener("change", () => {
+      if (cb.checked) {
+        selectedCategoryLabels.add(c.label);
+      } else {
+        selectedCategoryLabels.delete(c.label);
+      }
+      persistJobFilters();
+      resetVisibleJobs();
+      displayJobs();
+    });
+    const span = document.createElement("span");
+    span.textContent = c.label;
+    row.appendChild(cb);
+    row.appendChild(span);
+    host.appendChild(row);
+  });
+}
+
 document.getElementById("filterBtn").addEventListener("click", async () => {
-  const profile = getUserProfile();
+  persistJobFilters();
 
-  profile.skills = skillTags;
-  profile.courses = courseTags;
-  profile.projects = expTags;
-
-  saveUserProfile(profile);
-
-  matchResults = await fetchMatches(skillTags, courseTags, expTags, profile.resume_text || "");
+  matchResults = await fetchMatchesFromProfile();
   resetVisibleJobs();
   renderRecommendations();
   displayJobs();
 });
 
 document.getElementById("clearBtn").addEventListener("click", async () => {
-  skillTags = [];
-  courseTags = [];
-  expTags = [];
-
-  renderTagBubbles("skillsBubbles", skillTags);
-  renderTagBubbles("courseworkBubbles", courseTags);
-  renderTagBubbles("experienceBubbles", expTags);
-
+  jobTitleTags.length = 0;
+  selectedCategoryLabels.clear();
+  renderTagBubbles("jobTitleBubbles", jobTitleTags);
   document.getElementById("locationInput").value = "";
+  document.getElementById("jobTitleInput").value = "";
 
   selectedType = null;
   document.querySelectorAll(".bubble").forEach((b) => b.classList.remove("active-bubble"));
 
+  buildCategoryCheckboxes();
+  persistJobFilters();
+
   saveUserProfile({ skills: [], courses: [], projects: [], resume_text: "" });
 
-  matchResults = await fetchMatches([], [], [], "");
+  matchResults = await fetchMatchesFromProfile();
   resetVisibleJobs();
   renderRecommendations();
   displayJobs();
@@ -565,34 +791,24 @@ if (loadMoreBtn) {
   });
 }
 
-function onJobSearchChipsChanged() {
+function onJobTitleTagsChanged() {
+  persistJobFilters();
   resetVisibleJobs();
   displayJobs();
 }
-
-setupBubbleInput("jobSearchChipInput", "jobSearchChipBubbles", jobSearchChips, onJobSearchChipsChanged);
 
 async function init() {
   updateSavedCount();
   await fetchSavedJobIdsFromServer();
 
-  setupBubbleInput("skillsInput", "skillsBubbles", skillTags);
-  setupBubbleInput("courseworkInput", "courseworkBubbles", courseTags);
-  setupBubbleInput("experienceInput", "experienceBubbles", expTags);
+  loadJobFilterPrefs();
+  buildCategoryCheckboxes();
+  setupBubbleInput("jobTitleInput", "jobTitleBubbles", jobTitleTags, onJobTitleTagsChanged);
+  renderTagBubbles("jobTitleBubbles", jobTitleTags);
 
   await fetchJobs();
 
-  const profile = getUserProfile();
-
-  skillTags = profile.skills || [];
-  courseTags = profile.courses || [];
-  expTags = profile.projects || [];
-
-  renderTagBubbles("skillsBubbles", skillTags);
-  renderTagBubbles("courseworkBubbles", courseTags);
-  renderTagBubbles("experienceBubbles", expTags);
-
-  matchResults = await fetchMatches(skillTags, courseTags, expTags, profile.resume_text || "");
+  matchResults = await fetchMatchesFromProfile();
 
   renderRecommendations();
   displayJobs();

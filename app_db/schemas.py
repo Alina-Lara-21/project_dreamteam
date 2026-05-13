@@ -60,6 +60,8 @@ class ProfileSave(BaseModel):
     location: str = ""
     job_types: str = ""
     resume_text: str = ""
+    experience_entries_json: str = "[]"
+    education_json: str = "[]"
 
 
 class ProfileResponse(ProfileSave):

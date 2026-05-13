@@ -77,6 +77,69 @@ def list_from_pref(val: Any) -> list[str]:
     return [p.strip() for p in str(val).split(",") if p.strip()]
 
 
+def _parse_json_list(raw: str | None) -> list[Any]:
+    if not raw or not str(raw).strip():
+        return []
+    try:
+        data = json.loads(raw)
+        return data if isinstance(data, list) else []
+    except json.JSONDecodeError:
+        return []
+
+
+def _projects_from_profile_row(row: Any) -> list[str]:
+    out: list[str] = []
+    legacy = list_from_pref(getattr(row, "experience", None))
+    out.extend(legacy)
+    for entry in _parse_json_list(getattr(row, "experience_entries_json", None)):
+        if not isinstance(entry, dict):
+            continue
+        title = str(entry.get("title") or "").strip()
+        desc = str(entry.get("description") or "").strip()
+        if title:
+            out.append(title)
+        if desc:
+            out.append(desc)
+    return [p for p in out if p]
+
+
+def _education_text_blob(row: Any) -> str:
+    parts: list[str] = []
+    for entry in _parse_json_list(getattr(row, "education_json", None)):
+        if isinstance(entry, dict):
+            for key in ("school", "program", "course", "label"):
+                s = str(entry.get(key) or "").strip()
+                if s:
+                    parts.append(s)
+                    break
+        elif isinstance(entry, str) and entry.strip():
+            parts.append(entry.strip())
+    return " ".join(parts)
+
+
+def merge_sqlite_profile_into_user_profile(row: Any | None, body: UserProfile) -> UserProfile:
+    """Layer persisted /profile/data onto the request body for matching."""
+    if row is None:
+        return body
+    skills = body.skills if body.skills else list_from_pref(getattr(row, "skills", None))
+    courses = body.courses if body.courses else list_from_pref(getattr(row, "coursework", None))
+    from_row_projects = _projects_from_profile_row(row)
+    if body.projects:
+        projects = list(dict.fromkeys([*body.projects, *from_row_projects]))
+    else:
+        projects = from_row_projects
+
+    resume = (body.resume_text or "").strip() or None
+    if not resume:
+        resume = (getattr(row, "resume_text", None) or "").strip() or None
+    edu = _education_text_blob(row)
+    if edu:
+        base = (resume or "").strip()
+        resume = f"{base} {edu}".strip() if base else edu
+
+    return UserProfile(skills=skills, courses=courses, projects=projects, resume_text=resume)
+
+
 def merge_user_profile(prefs: dict[str, Any], body: UserProfile) -> UserProfile:
     """Fill empty body lists from saved preferences."""
     skills = body.skills if body.skills else list_from_pref(prefs.get("skills"))

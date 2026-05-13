@@ -5,26 +5,27 @@ const emailInput = document.getElementById("profileEmail");
 const skillsHidden = document.getElementById("profileSkillsHidden");
 const skillInput = document.getElementById("profileSkillInput");
 const skillBubblesEl = document.getElementById("profileSkillBubbles");
-const courseworkInput = document.getElementById("profileCoursework");
-const experienceInput = document.getElementById("profileExperience");
 const locationInput = document.getElementById("profileLocation");
-const resumeUpload = document.getElementById("resumeUpload");
-const resumePreview = document.getElementById("resumePreview");
 const saveBtn = document.getElementById("saveProfileBtn");
 const clearBtn = document.getElementById("clearProfileBtn");
 const bubbles = Array.from(document.querySelectorAll(".bubble"));
 
 const profileAvatar = document.getElementById("profileAvatar");
 const profileHeaderName = document.getElementById("profileHeaderName");
-const profilePercent = document.getElementById("profilePercent");
-const progressFill = document.getElementById("progressFill");
 const profileSaveStatus = document.getElementById("profileSaveStatus");
 
 const profileSavedJobs = document.getElementById("profileSavedJobs");
 const profileCompareJobs = document.getElementById("profileCompareJobs");
 const profileTrackerJobs = document.getElementById("profileTrackerJobs");
 
+const experienceList = document.getElementById("experienceList");
+const educationList = document.getElementById("educationList");
+const addExperienceBtn = document.getElementById("addExperienceBtn");
+const addEducationBtn = document.getElementById("addEducationBtn");
+
 let skillTags = [];
+let experienceEntries = [];
+let educationEntries = [];
 let profileLocked = false;
 
 function getProgressCode() {
@@ -44,7 +45,7 @@ function apiHeaders(extra = {}) {
 }
 
 function parseCsv(value) {
-  return value
+  return String(value || "")
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
@@ -96,48 +97,186 @@ function renderSkillBubbles() {
       skillTags.splice(index, 1);
       renderSkillBubbles();
       syncSkillsHidden();
-      updateProgress();
     });
     skillBubblesEl.appendChild(bubble);
   });
 }
 
-function updateProgress() {
-  const fields = [
-    nameInput.value,
-    emailInput.value,
-    skillTags.join(", "),
-    courseworkInput.value,
-    experienceInput.value,
-    resumePreview.value,
-  ];
-  const filled = fields.filter((value) => String(value || "").trim() !== "").length;
-  const percent = Math.round((filled / 6) * 100);
-  profilePercent.innerText = `${filled}/6 fields (${percent}%)`;
-  progressFill.style.width = `${percent}%`;
+function countTrackerJobs() {
+  try {
+    const raw = localStorage.getItem("trackerState");
+    if (!raw) return 0;
+    const s = JSON.parse(raw);
+    if (!s || typeof s !== "object") return 0;
+    return ["saved", "applied", "interview", "offer"].reduce((n, k) => {
+      const arr = s[k];
+      return n + (Array.isArray(arr) ? arr.length : 0);
+    }, 0);
+  } catch {
+    return 0;
+  }
 }
 
 function updateStats() {
   const savedJobs = JSON.parse(localStorage.getItem("savedJobs") || "[]");
   const compareList = JSON.parse(localStorage.getItem("compareJobs") || "[]");
-  const trackerJobs = JSON.parse(localStorage.getItem("trackerJobs") || "[]");
 
   profileSavedJobs.innerText = Array.isArray(savedJobs) ? savedJobs.length : 0;
   profileCompareJobs.innerText = Array.isArray(compareList) ? compareList.length : 0;
-  profileTrackerJobs.innerText = Array.isArray(trackerJobs) ? trackerJobs.length : 0;
+  profileTrackerJobs.innerText = countTrackerJobs();
+}
+
+function parseExperienceJson(raw) {
+  try {
+    const data = JSON.parse(raw || "[]");
+    if (!Array.isArray(data)) return [];
+    return data
+      .map((row, i) => {
+        if (!row || typeof row !== "object") return null;
+        const title = String(row.title || "").trim();
+        const description = String(row.description || "").trim();
+        return { id: row.id != null ? String(row.id) : `exp-${i}`, title, description };
+      })
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function parseEducationJson(raw) {
+  try {
+    const data = JSON.parse(raw || "[]");
+    if (!Array.isArray(data)) return [];
+    return data
+      .map((row, i) => {
+        if (!row || typeof row !== "object") return null;
+        const school = String(row.school || row.program || row.course || row.label || "").trim();
+        if (!school) return null;
+        return { id: row.id != null ? String(row.id) : `edu-${i}`, school };
+      })
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function renderExperience() {
+  if (!experienceList) return;
+  experienceList.innerHTML = "";
+  experienceEntries.forEach((entry, index) => {
+    const wrap = document.createElement("div");
+    wrap.className = "profile-entry-card";
+
+    const fields = document.createElement("div");
+    fields.className = "profile-entry-fields";
+
+    const lt = document.createElement("label");
+    lt.textContent = "Title";
+    const titleEl = document.createElement("input");
+    titleEl.type = "text";
+    titleEl.className = "exp-title";
+    titleEl.placeholder = "Role or project name";
+    titleEl.value = entry.title;
+    titleEl.addEventListener("input", () => {
+      experienceEntries[index].title = titleEl.value;
+    });
+
+    const ld = document.createElement("label");
+    ld.textContent = "Description";
+    const descEl = document.createElement("textarea");
+    descEl.className = "exp-desc";
+    descEl.rows = 3;
+    descEl.placeholder = "What you did";
+    descEl.value = entry.description;
+    descEl.addEventListener("input", () => {
+      experienceEntries[index].description = descEl.value;
+    });
+
+    fields.appendChild(lt);
+    fields.appendChild(titleEl);
+    fields.appendChild(ld);
+    fields.appendChild(descEl);
+
+    const actions = document.createElement("div");
+    actions.className = "profile-entry-actions";
+    const rm = document.createElement("button");
+    rm.type = "button";
+    rm.className = "remove-btn small-remove";
+    rm.textContent = "Remove";
+    rm.addEventListener("click", () => {
+      experienceEntries.splice(index, 1);
+      renderExperience();
+    });
+    actions.appendChild(rm);
+
+    wrap.appendChild(fields);
+    wrap.appendChild(actions);
+    experienceList.appendChild(wrap);
+  });
+}
+
+function renderEducation() {
+  if (!educationList) return;
+  educationList.innerHTML = "";
+  educationEntries.forEach((entry, index) => {
+    const wrap = document.createElement("div");
+    wrap.className = "profile-entry-card";
+
+    const fields = document.createElement("div");
+    fields.className = "profile-entry-fields";
+
+    const ls = document.createElement("label");
+    ls.textContent = "School / program / course";
+    const schoolEl = document.createElement("input");
+    schoolEl.type = "text";
+    schoolEl.className = "edu-school";
+    schoolEl.placeholder = "e.g. State University — B.S. Computer Science";
+    schoolEl.value = entry.school;
+    schoolEl.addEventListener("input", () => {
+      educationEntries[index].school = schoolEl.value;
+    });
+
+    fields.appendChild(ls);
+    fields.appendChild(schoolEl);
+
+    const actions = document.createElement("div");
+    actions.className = "profile-entry-actions";
+    const rm = document.createElement("button");
+    rm.type = "button";
+    rm.className = "remove-btn small-remove";
+    rm.textContent = "Remove";
+    rm.addEventListener("click", () => {
+      educationEntries.splice(index, 1);
+      renderEducation();
+    });
+    actions.appendChild(rm);
+
+    wrap.appendChild(fields);
+    wrap.appendChild(actions);
+    educationList.appendChild(wrap);
+  });
 }
 
 function readFormPayload() {
   syncSkillsHidden();
+  const expPayload = experienceEntries.map(({ title, description }) => ({
+    title: String(title || "").trim(),
+    description: String(description || "").trim(),
+  }));
+  const eduPayload = educationEntries.map(({ school }) => ({
+    school: String(school || "").trim(),
+  }));
   return {
     full_name: nameInput.value.trim(),
     email: emailInput.value.trim(),
     skills: skillTags.join(", "),
-    coursework: courseworkInput.value.trim(),
-    experience: experienceInput.value.trim(),
+    coursework: "",
+    experience: "",
     location: locationInput.value.trim(),
     job_types: selectedJobTypes().join(", "),
-    resume_text: resumePreview.value.trim(),
+    resume_text: "",
+    experience_entries_json: JSON.stringify(expPayload),
+    education_json: JSON.stringify(eduPayload),
   };
 }
 
@@ -147,13 +286,19 @@ function applyProfileData(data) {
   skillTags = parseCsv(data.skills || "");
   renderSkillBubbles();
   syncSkillsHidden();
-  courseworkInput.value = data.coursework || "";
-  experienceInput.value = data.experience || "";
   locationInput.value = data.location || "";
-  resumePreview.value = data.resume_text || "";
   setActiveBubbles(data.job_types || "");
+  experienceEntries = parseExperienceJson(data.experience_entries_json);
+  if (!experienceEntries.length) {
+    experienceEntries = [];
+  }
+  educationEntries = parseEducationJson(data.education_json);
+  if (!educationEntries.length) {
+    educationEntries = [];
+  }
+  renderExperience();
+  renderEducation();
   updateHeader(data.full_name || "");
-  updateProgress();
 }
 
 async function resumeProgressIfStored() {
@@ -194,13 +339,21 @@ async function ensureProgressSession() {
 
 function setProfileLocked(locked) {
   profileLocked = locked;
-  const fields = [nameInput, emailInput, skillInput, courseworkInput, experienceInput, locationInput, resumeUpload, resumePreview];
+  const fields = [nameInput, emailInput, skillInput, locationInput];
   fields.forEach((el) => {
     if (el) el.disabled = locked;
   });
   bubbles.forEach((b) => {
     b.disabled = locked;
     b.style.pointerEvents = locked ? "none" : "";
+  });
+  if (addExperienceBtn) addExperienceBtn.disabled = locked;
+  if (addEducationBtn) addEducationBtn.disabled = locked;
+  experienceList?.querySelectorAll("input, textarea, button").forEach((el) => {
+    el.disabled = locked;
+  });
+  educationList?.querySelectorAll("input, button").forEach((el) => {
+    el.disabled = locked;
   });
   clearBtn.innerText = locked ? "Edit Profile" : "Clear Profile";
 }
@@ -218,6 +371,8 @@ async function loadProfile() {
       location: "",
       job_types: "",
       resume_text: "",
+      experience_entries_json: "[]",
+      education_json: "[]",
     });
     setProfileLocked(false);
     return;
@@ -234,6 +389,8 @@ async function loadProfile() {
         location: "",
         job_types: "",
         resume_text: "",
+        experience_entries_json: "[]",
+        education_json: "[]",
       });
       setProfileLocked(false);
       return;
@@ -251,7 +408,6 @@ async function loadProfile() {
   } catch (error) {
     console.error("Failed to load profile data:", error);
     updateHeader(nameInput.value);
-    updateProgress();
     setProfileLocked(false);
   }
 }
@@ -296,6 +452,8 @@ async function clearProfile() {
     location: "",
     job_types: "",
     resume_text: "",
+    experience_entries_json: "[]",
+    education_json: "[]",
   };
   try {
     if (!getProgressCode()) {
@@ -340,7 +498,6 @@ function setupSkillChipInput() {
       skillInput.value = parts[parts.length - 1].trim();
       renderSkillBubbles();
       syncSkillsHidden();
-      updateProgress();
     }
   });
   skillInput.addEventListener("keydown", (e) => {
@@ -353,85 +510,40 @@ function setupSkillChipInput() {
       skillInput.value = "";
       renderSkillBubbles();
       syncSkillsHidden();
-      updateProgress();
     }
     if (e.key === "Backspace" && skillInput.value.trim() === "" && skillTags.length > 0) {
       skillTags.pop();
       renderSkillBubbles();
       syncSkillsHidden();
-      updateProgress();
     }
   });
-}
-
-async function handleResumeUpload() {
-  const file = resumeUpload.files && resumeUpload.files[0];
-  if (!file) return;
-  const lower = file.name.toLowerCase();
-  if (lower.endsWith(".pdf")) {
-    try {
-      if (!(await ensureProgressSession())) {
-        console.error("Resume upload needs an active session.");
-        return;
-      }
-      const fd = new FormData();
-      fd.append("file", file);
-      const headers = {};
-      const code = getProgressCode();
-      if (code) headers["X-Progress-Code"] = code;
-      const response = await fetch(`${API_BASE}/profile/resume`, {
-        method: "POST",
-        headers,
-        body: fd,
-      });
-      if (!response.ok) {
-        throw new Error(`resume parse failed: ${response.status}`);
-      }
-      const data = await response.json();
-      const found = Array.isArray(data.skills) ? data.skills : [];
-      found.forEach((s) => {
-        const v = String(s).trim().toLowerCase();
-        if (v && !skillTags.includes(v)) {
-          skillTags.push(v);
-        }
-      });
-      renderSkillBubbles();
-      syncSkillsHidden();
-      updateProgress();
-    } catch (error) {
-      console.error(error);
-    }
-    return;
-  }
-  if (!lower.endsWith(".txt")) {
-    console.error("Resume upload rejected: use .pdf or .txt.");
-    return;
-  }
-  const reader = new FileReader();
-  reader.onload = (event) => {
-    resumePreview.value = String(event.target?.result || "");
-    updateProgress();
-  };
-  reader.readAsText(file);
 }
 
 function bindEvents() {
   saveBtn.addEventListener("click", saveProfile);
   clearBtn.addEventListener("click", clearProfile);
-  resumeUpload.addEventListener("change", handleResumeUpload);
   bubbles.forEach((bubble) => {
     bubble.addEventListener("click", () => {
       if (profileLocked) return;
       bubble.classList.toggle("active");
-      updateProgress();
     });
   });
-  [nameInput, emailInput, courseworkInput, experienceInput, locationInput, resumePreview].forEach((input) =>
+  [nameInput, emailInput, locationInput].forEach((input) =>
     input.addEventListener("input", () => {
       updateHeader(nameInput.value);
-      updateProgress();
     }),
   );
+
+  addExperienceBtn?.addEventListener("click", () => {
+    if (profileLocked) return;
+    experienceEntries.push({ id: `exp-${Date.now()}`, title: "", description: "" });
+    renderExperience();
+  });
+  addEducationBtn?.addEventListener("click", () => {
+    if (profileLocked) return;
+    educationEntries.push({ id: `edu-${Date.now()}`, school: "" });
+    renderEducation();
+  });
 }
 
 document.addEventListener("DOMContentLoaded", async () => {

@@ -59,12 +59,18 @@ from services.jobs_mongo import (
     count_jobs,
 )
 from services.matcher import match_jobs, query_token_overlap_count
-from services.profile_preferences import load_preferences_map, merge_job_filters, merge_user_profile
+from app_db import models as orm_models
+from services.profile_preferences import (
+    load_preferences_map,
+    merge_job_filters,
+    merge_sqlite_profile_into_user_profile,
+    merge_user_profile,
+)
 from services.skill_mapper import normalize_many
 
 from app_db.database import get_db
 from app_db.deps import DependencyOptionalProgressUser
-from app_db.sqlite_migrate import ensure_user_progress_state_columns
+from app_db.sqlite_migrate import ensure_user_profile_columns, ensure_user_progress_state_columns
 from sqlalchemy.orm import Session
 
 _load_dotenv()
@@ -77,6 +83,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     ensure_user_progress_state_columns()
+    ensure_user_profile_columns()
 
     uri = (os.environ.get("MONGO_URI") or "").strip()
     force_json = os.environ.get("USE_JSON_JOBS", "").lower() in ("1", "true", "yes")
@@ -112,29 +119,41 @@ async def lifespan(app: FastAPI):
             DATA_FILE,
         )
     else:
-        client = AsyncIOMotorClient(uri)
-        app.state.mongo_client = client
-        db_name = (os.environ.get("DB_NAME") or os.environ.get("JOBS_DB") or "jobs").strip()
-        coll = jobs_collection(client[db_name])
+        mc = None
+        try:
+            mc = AsyncIOMotorClient(uri)
+            db_name = (os.environ.get("DB_NAME") or os.environ.get("JOBS_DB") or "jobs").strip()
+            coll = jobs_collection(mc[db_name])
+            n = await count_jobs(coll)
+            if n == 0:
+                raise RuntimeError("mongo_empty_count")
+            sample = await coll.find_one({})
+            if sample is None:
+                raise RuntimeError("mongo_find_one_empty")
+            doc_to_job(sample)
 
-        n = await count_jobs(coll)
-        if n == 0:
-            app.state.jobs_backend = "json"
-            app.state.mongo_collection = None
-            jobs_count = len(load_jobs_from_json())
-            logger.warning(
-                "Jobs startup source=json fallback_reason=mongo_empty total_jobs=%s mongo_db=%s",
-                jobs_count,
-                db_name,
-            )
-        else:
             app.state.jobs_backend = "mongo"
+            app.state.mongo_client = mc
             app.state.mongo_collection = coll
             app.state.mongo_total_jobs = n
+            mc = None  # owned by app.state
             logger.info(
                 "Jobs startup source=mongo total_jobs=%s mongo_db=%s",
                 n,
                 db_name,
+            )
+        except Exception as ex:
+            if mc is not None:
+                mc.close()
+            app.state.jobs_backend = "json"
+            app.state.mongo_client = None
+            app.state.mongo_collection = None
+            jobs_count = len(load_jobs_from_json())
+            logger.warning(
+                "Jobs startup source=json fallback_reason=mongo_unusable err=%s total_jobs=%s data_file=%s",
+                ex,
+                jobs_count,
+                resolve_jobs_json_path(),
             )
 
     if getattr(app.state, "jobs_backend", "json") == "mongo":
@@ -166,8 +185,28 @@ app.include_router(saved_jobs_router)
 app.include_router(progress_state_router)
 
 
-DATA_FILE = Path(__file__).with_name("data") / "jobs.json"
 MIN_JOBS_FOR_DEMO = 24
+
+
+def _candidate_jobs_json_paths() -> list[Path]:
+    """Resolve jobs.json for local dev, Render, and odd working directories."""
+    here = Path(__file__).resolve().parent
+    cwd = Path.cwd().resolve()
+    return [
+        here / "data" / "jobs.json",
+        here.with_name("data") / "jobs.json",  # legacy: sibling named "data" next to main.py
+        cwd / "data" / "jobs.json",
+    ]
+
+
+def resolve_jobs_json_path() -> Path | None:
+    for p in _candidate_jobs_json_paths():
+        if p.is_file():
+            return p
+    return None
+
+
+DATA_FILE = resolve_jobs_json_path() or (Path(__file__).resolve().parent / "data" / "jobs.json")
 
 
 def _expand_jobs_for_demo(jobs: list[Job], minimum_count: int = MIN_JOBS_FOR_DEMO) -> list[Job]:
@@ -193,13 +232,33 @@ def _expand_jobs_for_demo(jobs: list[Job], minimum_count: int = MIN_JOBS_FOR_DEM
 
 
 def load_jobs_from_json() -> list[Job]:
-    if not DATA_FILE.exists():
+    path = resolve_jobs_json_path()
+    if path is None or not path.is_file():
+        logger.error(
+            "jobs.json not found; candidates=%s cwd=%s",
+            [str(p) for p in _candidate_jobs_json_paths()],
+            Path.cwd(),
+        )
         return []
-    with DATA_FILE.open("r", encoding="utf-8") as fh:
-        payload = json.load(fh)
+    try:
+        with path.open("r", encoding="utf-8") as fh:
+            payload = json.load(fh)
+    except (OSError, json.JSONDecodeError) as ex:
+        logger.error("Failed to read jobs.json at %s: %s", path, ex)
+        return []
     if not isinstance(payload, list):
+        logger.error("jobs.json root must be a list, got %s", type(payload).__name__)
         return []
-    jobs = [Job(**normalize_job_record(dict(job))) for job in payload if isinstance(job, dict)]
+    jobs: list[Job] = []
+    for job in payload:
+        if not isinstance(job, dict):
+            continue
+        try:
+            jobs.append(Job(**normalize_job_record(dict(job))))
+        except Exception as ex:  # noqa: BLE001 — skip malformed rows, keep catalog up
+            logger.warning("Skipping malformed job row in %s: %s", path, ex)
+    if jobs:
+        logger.info("Loaded %s jobs from JSON file %s", len(jobs), path)
     return _expand_jobs_for_demo(jobs)
 
 
@@ -381,8 +440,12 @@ def _build_resume_bullets(profile: UserProfile) -> list[str]:
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+def health(request: Request) -> dict[str, str]:
+    return {
+        "status": "ok",
+        "jobs_backend": str(getattr(request.app.state, "jobs_backend", "?")),
+        "total_jobs": str(int(getattr(request.app.state, "total_jobs_available", 0))),
+    }
 
 
 def _job_text_blob(job: Job) -> str:
@@ -411,8 +474,9 @@ async def get_jobs(
     limit: int = Query(default=2000, ge=1, le=5000, description="Page size after filtering"),
     skip: int = Query(default=0, ge=0, description="Skip offset"),
     apply_saved_profile: bool = Query(
-        default=True,
-        description="When X-Progress-Code is sent, merge saved SQLite preferences unless false",
+        default=False,
+        description="When true and X-Progress-Code is sent, merge saved SQLite job-filter prefs into this request. "
+        "Default false so the job catalog stays full; the Jobs UI filters client-side.",
     ),
 ) -> JobsResponse:
     prefs = load_preferences_map(db, learner.id) if learner else {}
@@ -519,6 +583,13 @@ async def post_match(
 ) -> MatchResponse:
     prefs = load_preferences_map(db, learner.id) if learner else {}
     effective = merge_user_profile(prefs, profile) if (learner and apply_saved_profile) else profile
+    if learner and apply_saved_profile:
+        prow = (
+            db.query(orm_models.UserProfile)
+            .filter(orm_models.UserProfile.user_id == str(learner.id))
+            .first()
+        )
+        effective = merge_sqlite_profile_into_user_profile(prow, effective)
     jobs = await load_jobs_for_match(request)
     return MatchResponse(matches=match_jobs(effective, jobs))
 
@@ -533,6 +604,13 @@ async def skill_gap(
 ) -> SkillGapResponse:
     prefs = load_preferences_map(db, learner.id) if learner else {}
     effective = merge_user_profile(prefs, profile) if (learner and apply_saved_profile) else profile
+    if learner and apply_saved_profile:
+        prow = (
+            db.query(orm_models.UserProfile)
+            .filter(orm_models.UserProfile.user_id == str(learner.id))
+            .first()
+        )
+        effective = merge_sqlite_profile_into_user_profile(prow, effective)
     jobs = await load_jobs_for_match(request)
     matches = match_jobs(effective, jobs)
     return SkillGapResponse(
@@ -570,6 +648,13 @@ async def ai_search(
         resume_text=body.resume_text if body.use_resume_text else None,
     )
     effective = merge_user_profile(prefs, profile) if (learner and apply_saved_profile) else profile
+    if learner and apply_saved_profile:
+        prow = (
+            db.query(orm_models.UserProfile)
+            .filter(orm_models.UserProfile.user_id == str(learner.id))
+            .first()
+        )
+        effective = merge_sqlite_profile_into_user_profile(prow, effective)
 
     jobs_pool = await load_jobs_for_match(request)
     q = (body.query or "").strip().lower()

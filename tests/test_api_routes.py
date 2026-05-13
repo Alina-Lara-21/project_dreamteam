@@ -22,6 +22,21 @@ def test_jobs_pagination_skip_limit(client):
     assert len(r.json()["jobs"]) == 5
 
 
+def test_jobs_catalog_full_despite_saved_filter_prefs(client):
+    """Catalog GET /jobs must not merge saved filter prefs by default (avoids empty list on UI)."""
+    r = client.post("/progress/start", json={"display_name": "Filter User", "email": "filter@example.com"})
+    code = r.json()["progress_code"]
+    h = {"X-Progress-Code": code}
+    client.put(
+        "/saved-profile/preferences",
+        headers=h,
+        json={"preferences": {"skills": "totally_nonexistent_skill_zzzzz"}},
+    )
+    r = client.get("/jobs?limit=5000", headers=h)
+    assert r.status_code == 200
+    assert len(r.json()["jobs"]) == 24
+
+
 def test_saved_jobs_flow(client):
     r = client.post("/progress/start", json={"display_name": "Tester", "email": "tester@example.com"})
     assert r.status_code == 200
@@ -137,6 +152,8 @@ def test_profile_data_empty_on_first_get(client):
     assert data["location"] == ""
     assert data["job_types"] == ""
     assert data["resume_text"] == ""
+    assert data.get("experience_entries_json") == "[]"
+    assert data.get("education_json") == "[]"
 
 
 def test_profile_data_post_then_get_roundtrip(client):
@@ -153,6 +170,8 @@ def test_profile_data_post_then_get_roundtrip(client):
         "location": "Remote",
         "job_types": "Internship, Full-Time",
         "resume_text": "Built backend APIs.",
+        "experience_entries_json": '[{"title":"Intern","description":"APIs"}]',
+        "education_json": '[{"school":"State U"}]',
     }
     r = client.post("/profile/data", headers=headers, json=payload)
     assert r.status_code == 200

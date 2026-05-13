@@ -25,28 +25,6 @@ function authHeaders(extra = {}) {
   return code ? { ...extra, "X-Progress-Code": code } : extra;
 }
 
-async function syncSavedJobsFromBackend() {
-  const code = getProgressCode();
-  if (!code) return;
-
-  try {
-    const res = await fetch(`${window.location.origin}/saved-jobs`, {
-      headers: authHeaders(),
-    });
-
-    if (!res.ok) return;
-
-    const data = await res.json();
-    const jobs = data.jobs || data.saved_jobs || [];
-
-    if (jobs.length > 0) {
-      localStorage.setItem("savedJobs", JSON.stringify(jobs));
-    }
-  } catch (err) {
-    console.warn("Could not sync saved jobs from backend", err);
-  }
-}
-
 function getSavedJobs() {
   return JSON.parse(localStorage.getItem("savedJobs")) || [];
 }
@@ -81,30 +59,68 @@ let trackerState = JSON.parse(localStorage.getItem("trackerState") || "null");
 
 if (!trackerState) {
   trackerState = migrateFromLegacyBoard() || {
-    saved: [...getSavedJobs()],
+    saved: [],
     applied: [],
     interview: [],
     offer: [],
   };
   saveTrackerState();
-} else {
-  syncSavedJobsToTracker();
 }
 
 function saveTrackerState() {
   localStorage.setItem("trackerState", JSON.stringify(trackerState));
 }
 
-function syncSavedJobsToTracker() {
-  const savedJobs = getSavedJobs();
-  const trackedIds = Object.values(trackerState)
-    .flat()
-    .map((job) => normalizeId(job.id));
-  const missingSaved = savedJobs.filter((job) => !trackedIds.includes(normalizeId(job.id)));
-  if (missingSaved.length > 0) {
-    trackerState.saved = [...(trackerState.saved || []), ...missingSaved];
-    saveTrackerState();
+function syncSavedLocalStorage(jobs) {
+  localStorage.setItem("savedJobs", JSON.stringify(jobs || []));
+}
+
+async function fetchJobsCatalog() {
+  const code = getProgressCode();
+  const headers = code ? { "X-Progress-Code": code } : {};
+  try {
+    const res = await fetch(`${window.location.origin}/jobs?limit=5000`, { headers });
+    if (!res.ok) {
+      return [];
+    }
+    const data = await res.json();
+    return data.jobs || [];
+  } catch {
+    return [];
   }
+}
+
+async function hydrateSavedFromBackend() {
+  const code = getProgressCode();
+  if (!code) {
+    return;
+  }
+
+  let ids = [];
+  try {
+    const res = await fetch(`${window.location.origin}/saved-jobs`, {
+      headers: authHeaders(),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      ids = data.job_ids || [];
+    }
+  } catch (err) {
+    console.warn("saved-jobs fetch failed", err);
+  }
+
+  if (!ids.length) {
+    trackerState.saved = [];
+    saveTrackerState();
+    syncSavedLocalStorage([]);
+    return;
+  }
+
+  const catalog = await fetchJobsCatalog();
+  const byId = Object.fromEntries(catalog.map((j) => [normalizeId(j.id), j]));
+  trackerState.saved = ids.map((id) => byId[normalizeId(id)]).filter(Boolean);
+  saveTrackerState();
+  syncSavedLocalStorage(trackerState.saved);
 }
 
 function launchConfetti() {
@@ -161,6 +177,21 @@ function openTrackerModal(job) {
   modal.classList.remove("hidden");
 }
 
+async function deleteSavedJobOnServer(jobId) {
+  const code = getProgressCode();
+  if (!code) {
+    return;
+  }
+  try {
+    await fetch(`${window.location.origin}/saved-jobs/${jobId}`, {
+      method: "DELETE",
+      headers: authHeaders(),
+    });
+  } catch (_) {
+    /* ignore */
+  }
+}
+
 function removeJob(id, status) {
   const cards = document.querySelectorAll(".mini-job");
   cards.forEach((card) => {
@@ -172,9 +203,10 @@ function removeJob(id, status) {
       ],
       { duration: 250, easing: "ease", fill: "forwards" },
     );
-    setTimeout(() => {
+    setTimeout(async () => {
       trackerState[status] = trackerState[status].filter((job) => normalizeId(job.id) !== normalizeId(id));
       if (status === "saved") {
+        await deleteSavedJobOnServer(id);
         const savedJobs = getSavedJobs();
         localStorage.setItem(
           "savedJobs",
@@ -195,7 +227,11 @@ function renderTracker() {
     const column = trackerColumns[status];
     if (!column) return;
     if (trackerState[status].length === 0) {
-      column.innerHTML = `<div class="empty-column">Drop jobs here</div>`;
+      const msg =
+        status === "saved"
+          ? `<div class="empty-column">No saved jobs yet. Save roles from the Jobs page.</div>`
+          : `<div class="empty-column">Drop jobs here</div>`;
+      column.innerHTML = msg;
       return;
     }
     trackerState[status].forEach((job) => {
@@ -271,8 +307,7 @@ window.addEventListener("click", (e) => {
 });
 
 async function initTracker() {
-  await syncSavedJobsFromBackend();
-  syncSavedJobsToTracker();
+  await hydrateSavedFromBackend();
   renderTracker();
 }
 
