@@ -1,25 +1,48 @@
-# Group-1-Software-Engineering-Project
+# DreamTeam Job Matching System
 
-Software Engineering Course: Final Project
+Software Engineering Final Project
 
-## Run the FastAPI backend
+## Overview
 
-1. Install dependencies:
-   ```bash
-   python3 -m pip install -r requirements.txt
-   ```
-2. Start the API server:
-   ```bash
-   python3 -m uvicorn main:app --reload
-   ```
+DreamTeam Job Matching System is a web-based application designed to help users match their skills, coursework, and experience with available job postings. The system uses filtering and matching algorithms to recommend relevant jobs and provide an interactive user experience.
 
-The root HTML app's `script.js` calls the API on the same origin (`window.location.origin`). To point at a different backend, set `window.__API_BASE__` before loading scripts. The Vite app in `frontend/` uses `VITE_API_URL` when set (see `frontend/src/apiBase.ts`).
+The project combines a FastAPI backend with a frontend interface built using HTML, CSS, JavaScript, and TypeScript components.
 
-## API endpoints
+---
 
-- `GET /health` - service health check
-- `GET /jobs` - list jobs, with optional query params:
-  - `skills` (comma-separated)
-  - `coursework` (comma-separated)
-  - `experience` (comma-separated)
-- `GET /jobs/filter` - same filtering behavior as `/jobs` (kept for compatibility)
+## Features
+
+- Job matching based on:
+  - Skills
+  - Coursework
+  - Experience
+- FastAPI backend API
+- Interactive frontend pages
+- User profile management
+- Job tracking functionality
+- Filtering and comparison tools
+- Database integration
+- Automated data ingestion scripts
+- Skill extraction and matching algorithms
+
+---
+
+## Project Structure
+
+```text
+project_dreamteam/
+│
+├── frontend/              # Frontend application
+├── routers/               # API route handlers
+├── services/              # Backend services
+├── app_db/                # Database files
+├── data/                  # Data storage
+├── images/                # Project images/assets
+│
+├── main.py                # Main FastAPI application
+├── db.py                  # Database connection logic
+├── models.py              # Database models
+├── matching.py            # Job matching logic
+├── skill_extraction.py    # Skill extraction utilities
+├── requirements.txt       # Python dependencies
+└── README.md
