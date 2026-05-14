@@ -1,83 +1,164 @@
-const API_BASE = window.location.origin;
+/* =========================
+   BRIDGE - MERGED SCRIPT.JS
+   FINAL COMBINED VERSION
+========================= */
+
+const API_BASE = window.__API_BASE__ || window.location.origin;
+
+/* =========================
+   CATEGORY FILTERS
+========================= */
 
 const JOB_CATEGORIES = [
   {
     id: "ai",
     label: "AI & Machine Learning",
-    keys: ["machine learning", "deep learning", "llm", "nlp", "tensorflow", "pytorch", "neural net", "computer vision", " ai ", "ml "],
+    keys: [
+      "machine learning",
+      "deep learning",
+      "llm",
+      "nlp",
+      "tensorflow",
+      "pytorch",
+      "computer vision",
+      " ai ",
+      "ml ",
+    ],
   },
   {
     id: "data",
     label: "Data & Analytics",
-    keys: ["data analyst", "data engineer", "analytics", "business intelligence", "sql", "warehouse", "etl", "tableau", "power bi"],
-  },
-  {
-    id: "pm",
-    label: "Project Management",
-    keys: ["project manager", "program manager", "scrum", "agile", "pmp", "delivery manager"],
-  },
-  {
-    id: "ops",
-    label: "Operations & Support",
-    keys: ["operations", "customer support", "help desk", "technical support", "service desk", "it support"],
+    keys: [
+      "data analyst",
+      "data engineer",
+      "analytics",
+      "business intelligence",
+      "sql",
+      "etl",
+      "tableau",
+      "power bi",
+    ],
   },
   {
     id: "sw",
     label: "Software Development",
-    keys: ["software engineer", "developer", "backend", "frontend", "full stack", "devops", "sre", "java", "python", "react", "node"],
+    keys: [
+      "software engineer",
+      "developer",
+      "frontend",
+      "backend",
+      "full stack",
+      "react",
+      "node",
+      "python",
+      "java",
+    ],
+  },
+  {
+    id: "it",
+    label: "IT & Cybersecurity",
+    keys: [
+      "network",
+      "sysadmin",
+      "cybersecurity",
+      "security engineer",
+      "infrastructure",
+    ],
   },
   {
     id: "ux",
     label: "Design & UX",
-    keys: ["ux", "ui ", "product design", "figma", "graphic design", "designer"],
-  },
-  {
-    id: "mkt",
-    label: "Marketing",
-    keys: ["marketing", "seo", "content", "social media", "growth", "brand"],
-  },
-  {
-    id: "fin",
-    label: "Finance",
-    keys: ["finance", "accounting", "financial", "controller", "fp&a", "audit"],
-  },
-  {
-    id: "sales",
-    label: "Sales",
-    keys: ["sales", "account executive", "business development", "bdr", "sdr"],
-  },
-  {
-    id: "it",
-    label: "IT",
-    keys: ["network", "sysadmin", "systems administrator", "infrastructure", "cybersecurity", "security engineer"],
+    keys: ["ux", "ui", "figma", "designer", "product design"],
   },
 ];
 
+/* =========================
+   GLOBAL STATE
+========================= */
+
 let jobs = [];
 let matchResults = [];
+
 let selectedType = null;
 let currentSort = "best";
 
-let jobTitleTags = [];
-const selectedCategoryLabels = new Set();
+let skillTags = [];
+let courseTags = [];
+let expTags = [];
+let jobSearchChips = [];
 
 let visibleJobsCount = 5;
 const JOBS_PAGE_INCREMENT = 5;
 
+const selectedCategoryLabels = new Set();
 const savedJobIdsServer = new Set();
 
+/* =========================
+   HELPERS
+========================= */
+
+function normalizeId(id) {
+  return String(id);
+}
+
+function truncateText(text, maxLen) {
+  const s = String(text || "");
+  return s.length <= maxLen ? s : `${s.slice(0, maxLen)}…`;
+}
+
 function getProgressCode() {
-  return localStorage.getItem("bridge_progress_code") || "";
+  return (
+    localStorage.getItem("bridge_progress_code") ||
+    localStorage.getItem("progressCode") ||
+    localStorage.getItem("progress_code") ||
+    ""
+  );
 }
 
 function apiJsonHeaders() {
-  const headers = { "Content-Type": "application/json" };
+  const headers = {
+    "Content-Type": "application/json",
+  };
+
   const code = getProgressCode();
+
   if (code) {
     headers["X-Progress-Code"] = code;
   }
+
   return headers;
 }
+
+function normalizeTypeLabel(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[\s_]+/g, "-");
+}
+
+function getJobType(job) {
+  return job.job_type || job.type || "Job Type";
+}
+
+function resetVisibleJobs() {
+  visibleJobsCount = JOBS_PAGE_INCREMENT;
+}
+
+function showToast(message) {
+  const toast = document.getElementById("toast");
+
+  if (!toast) return;
+
+  toast.textContent = message;
+  toast.classList.remove("hidden");
+
+  setTimeout(() => {
+    toast.classList.add("hidden");
+  }, 2200);
+}
+
+/* =========================
+   PROFILE
+========================= */
 
 function getUserProfile() {
   return (
@@ -86,6 +167,8 @@ function getUserProfile() {
       courses: [],
       projects: [],
       resume_text: "",
+      selectedType: null,
+      location: "",
     }
   );
 }
@@ -94,279 +177,405 @@ function saveUserProfile(profile) {
   localStorage.setItem("userProfile", JSON.stringify(profile));
 }
 
-function parseCsvSkills(s) {
-  return String(s || "")
-    .split(",")
-    .map((x) => x.trim())
-    .filter(Boolean);
+function saveCurrentFiltersToProfile() {
+  const profile = getUserProfile();
+
+  profile.skills = skillTags;
+  profile.courses = courseTags;
+  profile.projects = expTags;
+  profile.selectedType = selectedType;
+
+  const locationInput = document.getElementById("locationInput");
+
+  if (locationInput) {
+    profile.location = locationInput.value.trim();
+  }
+
+  saveUserProfile(profile);
+}
+
+function loadProfileFilters() {
+  const profile = getUserProfile();
+
+  skillTags = profile.skills || [];
+  courseTags = profile.courses || [];
+  expTags = profile.projects || [];
+  selectedType = profile.selectedType || null;
+
+  const locationInput = document.getElementById("locationInput");
+
+  if (locationInput) {
+    locationInput.value = profile.location || "";
+  }
+
+  renderTagBubbles("skillsBubbles", skillTags, onFilterTagsChanged);
+  renderTagBubbles("courseworkBubbles", courseTags, onFilterTagsChanged);
+  renderTagBubbles("experienceBubbles", expTags, onFilterTagsChanged);
+
+  document.querySelectorAll(".bubble").forEach((bubble) => {
+    bubble.classList.remove("active-bubble");
+
+    if (bubble.dataset.type === selectedType) {
+      bubble.classList.add("active-bubble");
+    }
+  });
+}
+
+/* =========================
+   SAVED JOBS
+========================= */
+
+function getSavedJobs() {
+  return JSON.parse(localStorage.getItem("savedJobs")) || [];
 }
 
 function updateSavedCount() {
-  const saved = JSON.parse(localStorage.getItem("savedJobs")) || [];
-  document.getElementById("savedJobsCount").textContent = saved.length;
+  const el = document.getElementById("savedJobsCount");
+
+  if (el) {
+    el.textContent = getSavedJobs().length;
+  }
 }
 
-function truncateText(text, maxLen) {
-  const str = String(text || "");
-  if (str.length <= maxLen) {
-    return str;
-  }
-  return `${str.slice(0, maxLen)}…`;
-}
-
-function normalizeTypeLabel(s) {
-  return String(s || "")
-    .toLowerCase()
-    .replace(/[\s_]+/g, "-");
-}
-
-function jobMatchesSelectedType(job) {
-  if (!selectedType) {
-    return true;
-  }
-  const jt = normalizeTypeLabel(job.job_type || "");
-  const sel = normalizeTypeLabel(selectedType);
-  if (jt === sel) {
-    return true;
-  }
-  const jx = jt.replace(/-/g, "");
-  const sx = sel.replace(/-/g, "");
-  return jx === sx;
+function isJobSaved(jobId) {
+  return (
+    savedJobIdsServer.has(jobId) ||
+    getSavedJobs().some(
+      (job) => normalizeId(job.id) === normalizeId(jobId)
+    )
+  );
 }
 
 async function fetchSavedJobIdsFromServer() {
   savedJobIdsServer.clear();
+
   const code = getProgressCode();
-  if (!code) {
-    return;
-  }
+
+  if (!code) return;
+
   try {
     const response = await fetch(`${API_BASE}/saved-jobs`, {
-      headers: { "X-Progress-Code": code },
+      headers: {
+        "X-Progress-Code": code,
+      },
     });
-    if (!response.ok) {
-      return;
-    }
+
+    if (!response.ok) return;
+
     const data = await response.json();
-    (data.job_ids || []).forEach((id) => savedJobIdsServer.add(id));
+
+    (data.job_ids || []).forEach((id) => {
+      savedJobIdsServer.add(id);
+    });
   } catch (error) {
-    console.error("saved-jobs fetch failed", error);
+    console.error(error);
   }
 }
 
-function renderTagBubbles(containerId, listRef) {
-  const container = document.getElementById(containerId);
-  if (!container) {
+function syncTrackerSavedState(job, savedNow) {
+  const raw = localStorage.getItem("trackerState");
+
+  if (!raw) return;
+
+  let trackerState;
+
+  try {
+    trackerState = JSON.parse(raw);
+  } catch {
     return;
   }
+
+  trackerState.saved = trackerState.saved || [];
+
+  if (savedNow) {
+    const exists = trackerState.saved.some(
+      (item) => normalizeId(item.id) === normalizeId(job.id)
+    );
+
+    if (!exists) {
+      trackerState.saved.push(job);
+    }
+  } else {
+    trackerState.saved = trackerState.saved.filter(
+      (item) => normalizeId(item.id) !== normalizeId(job.id)
+    );
+  }
+
+  localStorage.setItem(
+    "trackerState",
+    JSON.stringify(trackerState)
+  );
+}
+
+async function saveJob(job) {
+  let saved = getSavedJobs();
+
+  if (isJobSaved(job.id)) {
+    saved = saved.filter(
+      (item) => normalizeId(item.id) !== normalizeId(job.id)
+    );
+
+    localStorage.setItem("savedJobs", JSON.stringify(saved));
+
+    savedJobIdsServer.delete(job.id);
+
+    const code = getProgressCode();
+
+    if (code) {
+      try {
+        await fetch(`${API_BASE}/saved-jobs/${job.id}`, {
+          method: "DELETE",
+          headers: apiJsonHeaders(),
+        });
+      } catch (error) {
+        console.warn(error);
+      }
+    }
+
+    syncTrackerSavedState(job, false);
+
+    updateSavedCount();
+
+    showToast("Job removed from saved.");
+
+    return false;
+  }
+
+  saved.push(job);
+
+  localStorage.setItem("savedJobs", JSON.stringify(saved));
+
+  savedJobIdsServer.add(job.id);
+
+  const code = getProgressCode();
+
+  if (code) {
+    try {
+      await fetch(`${API_BASE}/saved-jobs`, {
+        method: "POST",
+        headers: apiJsonHeaders(),
+        body: JSON.stringify({
+          job_id: job.id,
+        }),
+      });
+    } catch (error) {
+      console.warn(error);
+    }
+  }
+
+  syncTrackerSavedState(job, true);
+
+  updateSavedCount();
+
+  showToast("Job saved.");
+
+  return true;
+}
+
+/* =========================
+   COMPARE JOBS
+========================= */
+
+function getCompareJobs() {
+  return JSON.parse(localStorage.getItem("compareJobs")) || [];
+}
+
+function isJobCompared(jobId) {
+  return getCompareJobs().some(
+    (job) => normalizeId(job.id) === normalizeId(jobId)
+  );
+}
+
+function compareJob(job) {
+  let compare = getCompareJobs();
+
+  if (isJobCompared(job.id)) {
+    compare = compare.filter(
+      (item) => normalizeId(item.id) !== normalizeId(job.id)
+    );
+
+    localStorage.setItem(
+      "compareJobs",
+      JSON.stringify(compare)
+    );
+
+    showToast("Job removed from Compare.");
+
+    return false;
+  }
+
+  compare.push(job);
+
+  localStorage.setItem(
+    "compareJobs",
+    JSON.stringify(compare)
+  );
+
+  showToast("Added to Compare.");
+
+  return true;
+}
+
+/* =========================
+   TAG BUBBLES
+========================= */
+
+function renderTagBubbles(containerId, listRef, onChange) {
+  const container = document.getElementById(containerId);
+
+  if (!container) return;
+
   container.innerHTML = "";
 
   listRef.forEach((tag, index) => {
     const bubble = document.createElement("div");
+
     bubble.className = "input-bubble";
 
     bubble.innerHTML = `
       ${tag}
-      <span title="Remove">&times;</span>
+      <span>&times;</span>
     `;
 
     bubble.querySelector("span").addEventListener("click", () => {
       listRef.splice(index, 1);
-      renderTagBubbles(containerId, listRef);
+
+      renderTagBubbles(containerId, listRef, onChange);
+
+      if (onChange) {
+        onChange();
+      }
     });
 
     container.appendChild(bubble);
   });
 }
 
-function setupBubbleInput(inputId, containerId, listRef, onChange) {
+function setupBubbleInput(
+  inputId,
+  containerId,
+  listRef,
+  onChange
+) {
   const input = document.getElementById(inputId);
-  if (!input) {
-    return;
-  }
 
-  input.addEventListener("input", () => {
-    if (input.value.includes(",")) {
-      const parts = input.value.split(",");
-
-      parts.slice(0, -1).forEach((part) => {
-        const value = part.trim();
-        if (value && !listRef.includes(value)) {
-          listRef.push(value);
-        }
-      });
-
-      input.value = parts[parts.length - 1].trim();
-      renderTagBubbles(containerId, listRef);
-      if (onChange) {
-        onChange();
-      }
-    }
-  });
+  if (!input) return;
 
   input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
+    if (e.key !== "Enter") return;
 
-      const value = input.value.trim();
-      if (!value) {
-        return;
-      }
+    e.preventDefault();
 
-      if (!listRef.includes(value)) {
-        listRef.push(value);
-      }
+    const value = input.value.trim();
 
-      input.value = "";
-      renderTagBubbles(containerId, listRef);
-      if (onChange) {
-        onChange();
-      }
+    if (!value) return;
+
+    if (!listRef.includes(value)) {
+      listRef.push(value);
     }
 
-    if (e.key === "Backspace" && input.value.trim() === "" && listRef.length > 0) {
-      listRef.pop();
-      renderTagBubbles(containerId, listRef);
-      if (onChange) {
-        onChange();
-      }
+    input.value = "";
+
+    renderTagBubbles(containerId, listRef, onChange);
+
+    if (onChange) {
+      onChange();
     }
   });
 }
 
-function resetVisibleJobs() {
-  visibleJobsCount = JOBS_PAGE_INCREMENT;
-}
+/* =========================
+   API
+========================= */
 
 async function fetchJobs() {
   try {
-    const headers = {};
-    const code = getProgressCode();
-    if (code) {
-      headers["X-Progress-Code"] = code;
-    }
-    const response = await fetch(`${API_BASE}/jobs?limit=5000`, { headers });
+    const response = await fetch(
+      `${API_BASE}/jobs?limit=5000`
+    );
+
     const data = await response.json();
+
     jobs = data.jobs || [];
-    document.getElementById("totalJobsCount").textContent = jobs.length;
+
+    const total = document.getElementById("totalJobsCount");
+
+    if (total) {
+      total.textContent = jobs.length;
+    }
   } catch (error) {
-    console.error("Error fetching jobs:", error);
+    console.error(error);
+
+    showToast("Could not load jobs.");
   }
 }
 
-async function buildMatchProfileBody() {
-  const local = getUserProfile();
-  const code = getProgressCode();
-  if (!code) {
-    return {
-      skills: local.skills || [],
-      courses: local.courses || [],
-      projects: local.projects || [],
-      resume_text: (local.resume_text || "").trim(),
-    };
-  }
+async function fetchMatches(
+  skills,
+  courses,
+  projects,
+  resumeText
+) {
   try {
-    const r = await fetch(`${API_BASE}/profile/data`, {
-      headers: { "X-Progress-Code": code },
-    });
-    if (!r.ok) {
-      throw new Error("profile fetch failed");
-    }
-    const d = await r.json();
-    const skills = parseCsvSkills(d.skills);
-    const projects = [];
-    try {
-      const ex = JSON.parse(d.experience_entries_json || "[]");
-      if (Array.isArray(ex)) {
-        ex.forEach((e) => {
-          if (e && e.title) projects.push(String(e.title));
-          if (e && e.description) projects.push(String(e.description));
-        });
-      }
-    } catch (_) {
-      /* ignore */
-    }
-    let eduBlob = "";
-    try {
-      const ed = JSON.parse(d.education_json || "[]");
-      if (Array.isArray(ed)) {
-        ed.forEach((row) => {
-          if (row && typeof row === "object") {
-            eduBlob += ` ${row.school || row.program || row.course || ""}`;
-            eduBlob += ` ${row.description || ""}`;
-          }
-        });
-      }
-    } catch (_) {
-      /* ignore */
-    }
-    const resume_text = [d.resume_text || "", eduBlob].filter((x) => String(x).trim()).join(" ").trim();
-    return {
-      skills: skills.length ? skills : local.skills || [],
-      courses: (d.coursework && parseCsvSkills(d.coursework)) || local.courses || [],
-      projects: projects.length ? projects : local.projects || [],
-      resume_text: resume_text || (local.resume_text || "").trim(),
-    };
-  } catch {
-    return {
-      skills: local.skills || [],
-      courses: local.courses || [],
-      projects: local.projects || [],
-      resume_text: (local.resume_text || "").trim(),
-    };
-  }
-}
-
-async function fetchMatchesFromProfile() {
-  try {
-    const body = await buildMatchProfileBody();
     const response = await fetch(`${API_BASE}/match`, {
       method: "POST",
       headers: apiJsonHeaders(),
       body: JSON.stringify({
-        skills: body.skills,
-        courses: body.courses,
-        projects: body.projects,
-        resume_text: body.resume_text,
+        skills,
+        courses,
+        projects,
+        resume_text: resumeText || "",
       }),
     });
 
     const data = await response.json();
+
     return data.matches || [];
   } catch (error) {
-    console.error("Error fetching matches:", error);
+    console.error(error);
+
     return [];
   }
 }
 
-function jobHaystack(item) {
+/* =========================
+   FILTERING
+========================= */
+
+function jobHaystack(job) {
   return [
-    item.title,
-    item.company,
-    item.location || "",
-    item.description || "",
-    item.job_type || "",
-    (item.skills_required || []).join(" "),
+    job.title,
+    job.company,
+    job.location,
+    job.description,
+    getJobType(job),
+    ...(job.skills_required || []),
   ]
+    .filter(Boolean)
     .join(" ")
     .toLowerCase();
 }
 
 function inferJobCategoryLabels(job) {
   const hay = jobHaystack(job);
+
   const out = new Set();
+
   for (const c of JOB_CATEGORIES) {
-    const lab = c.label.toLowerCase();
-    if (hay.includes(lab)) {
+    const label = c.label.toLowerCase();
+
+    if (hay.includes(label)) {
       out.add(c.label);
     }
-    for (const k of c.keys) {
-      if (hay.includes(k)) {
+
+    for (const key of c.keys) {
+      if (hay.includes(key)) {
         out.add(c.label);
         break;
       }
     }
   }
+
   return [...out];
 }
 
@@ -374,463 +583,666 @@ function jobMatchesSelectedCategories(job) {
   if (selectedCategoryLabels.size === 0) {
     return true;
   }
+
   const inferred = inferJobCategoryLabels(job);
-  const hay = jobHaystack(job);
-  for (const sel of selectedCategoryLabels) {
-    if (inferred.includes(sel)) {
-      return true;
-    }
-    const words = sel
-      .toLowerCase()
-      .split(/[^a-z0-9]+/)
-      .filter((w) => w.length > 2);
-    if (words.length && words.every((w) => hay.includes(w))) {
+
+  for (const selected of selectedCategoryLabels) {
+    if (inferred.includes(selected)) {
       return true;
     }
   }
+
   return false;
 }
 
-function isJobSavedLocally(job) {
-  const saved = JSON.parse(localStorage.getItem("savedJobs")) || [];
-  return saved.some((j) => j.id === job.id);
-}
+function buildCategoryCheckboxes() {
+  const host = document.getElementById(
+    "jobCategoryChecks"
+  );
 
-function isJobSaved(job) {
-  return savedJobIdsServer.has(job.id) || isJobSavedLocally(job);
-}
+  if (!host) return;
 
-async function saveJob(job) {
-  const code = getProgressCode();
-  if (code) {
-    try {
-      const response = await fetch(`${API_BASE}/saved-jobs`, {
-        method: "POST",
-        headers: apiJsonHeaders(),
-        body: JSON.stringify({ job_id: job.id }),
-      });
-      if (response.status === 204) {
-        savedJobIdsServer.add(job.id);
+  host.innerHTML = "";
+
+  JOB_CATEGORIES.forEach((category) => {
+    const row = document.createElement("label");
+
+    row.className = "job-cat-row";
+
+    const cb = document.createElement("input");
+
+    cb.type = "checkbox";
+    cb.value = category.label;
+
+    cb.checked = selectedCategoryLabels.has(
+      category.label
+    );
+
+    cb.addEventListener("change", () => {
+      if (cb.checked) {
+        selectedCategoryLabels.add(category.label);
+      } else {
+        selectedCategoryLabels.delete(category.label);
       }
-    } catch (error) {
-      console.error("save job server failed", error);
-    }
-  }
 
-  let saved = JSON.parse(localStorage.getItem("savedJobs")) || [];
+      persistJobFilters();
 
-  if (!saved.find((j) => j.id === job.id)) {
-    saved.push(job);
-    localStorage.setItem("savedJobs", JSON.stringify(saved));
-  }
+      resetVisibleJobs();
 
-  updateSavedCount();
+      displayJobs();
+    });
+
+    const span = document.createElement("span");
+
+    span.textContent = category.label;
+
+    row.appendChild(cb);
+    row.appendChild(span);
+
+    host.appendChild(row);
+  });
 }
 
-function compareJob(job) {
-  let compare = JSON.parse(localStorage.getItem("compareJobs")) || [];
+function persistJobFilters() {
+  localStorage.setItem(
+    "bridge_job_categories",
+    JSON.stringify([...selectedCategoryLabels])
+  );
+}
 
-  if (!compare.find((j) => j.id === job.id)) {
-    compare.push(job);
-    localStorage.setItem("compareJobs", JSON.stringify(compare));
-    alert("Added to Compare!");
-  }
+function loadJobFilterPrefs() {
+  try {
+    const categories = JSON.parse(
+      localStorage.getItem(
+        "bridge_job_categories"
+      ) || "[]"
+    );
+
+    selectedCategoryLabels.clear();
+
+    categories.forEach((cat) => {
+      selectedCategoryLabels.add(cat);
+    });
+  } catch {}
+}
+
+function jobMatchesSelectedType(job) {
+  if (!selectedType) return true;
+
+  return (
+    normalizeTypeLabel(getJobType(job)) ===
+    normalizeTypeLabel(selectedType)
+  );
 }
 
 function applyFilters(list) {
   let filtered = [...list];
 
-  if (jobTitleTags.length) {
-    filtered = filtered.filter((item) => {
-      const hay = jobHaystack(item);
-      return jobTitleTags.every((chip) => hay.includes(String(chip).toLowerCase()));
+  if (jobSearchChips.length > 0) {
+    filtered = filtered.filter((job) => {
+      const hay = jobHaystack(job);
+
+      return jobSearchChips.every((chip) =>
+        hay.includes(String(chip).toLowerCase())
+      );
     });
   }
 
-  filtered = filtered.filter((item) => jobMatchesSelectedCategories(item));
+  filtered = filtered.filter((job) =>
+    jobMatchesSelectedCategories(job)
+  );
 
   if (selectedType) {
-    filtered = filtered.filter((item) => jobMatchesSelectedType(item));
+    filtered = filtered.filter((job) =>
+      jobMatchesSelectedType(job)
+    );
   }
 
-  const locInput = document.getElementById("locationInput").value.trim();
-  if (locInput) {
-    filtered = filtered.filter((item) => (item.location || "").toLowerCase().includes(locInput.toLowerCase()));
+  const locationInput =
+    document.getElementById("locationInput");
+
+  const locationValue = locationInput
+    ? locationInput.value.trim().toLowerCase()
+    : "";
+
+  if (locationValue) {
+    filtered = filtered.filter((job) =>
+      String(job.location || "")
+        .toLowerCase()
+        .includes(locationValue)
+    );
   }
 
   if (currentSort === "best") {
-    filtered.sort((a, b) => (b.match_score || 0) - (a.match_score || 0));
+    filtered.sort(
+      (a, b) =>
+        (b.match_score || 0) -
+        (a.match_score || 0)
+    );
   }
 
   if (currentSort === "newest") {
-    filtered.sort((a, b) => new Date(b.postedDate || 0) - new Date(a.postedDate || 0));
+    filtered.sort(
+      (a, b) =>
+        new Date(b.postedDate || 0) -
+        new Date(a.postedDate || 0)
+    );
   }
 
   if (currentSort === "az") {
-    filtered.sort((a, b) => a.title.localeCompare(b.title));
+    filtered.sort((a, b) =>
+      a.title.localeCompare(b.title)
+    );
   }
 
   if (currentSort === "za") {
-    filtered.sort((a, b) => b.title.localeCompare(a.title));
+    filtered.sort((a, b) =>
+      b.title.localeCompare(a.title)
+    );
   }
 
   return filtered;
 }
 
-function renderRecommendations() {
-  const container = document.getElementById("recommendedJobs");
-  container.innerHTML = "";
+function getCombinedJobs() {
+  const matchMap = new Map(
+    matchResults.map((m) => [
+      normalizeId(m.job_id),
+      m,
+    ])
+  );
 
-  const ranked = [...matchResults].sort((a, b) => b.match_score - a.match_score);
-  const top3 = ranked.slice(0, 3);
-
-  if (top3.length === 0) {
-    container.innerHTML = `<p style="color:#555;">Add skills and experience on your Profile to see stronger AI matches.</p>`;
-    return;
-  }
-
-  top3.forEach((match) => {
-    const card = document.createElement("div");
-    card.className = "recommended-card";
-
-    card.addEventListener("click", () => openJobModal(match.job_id));
-
-    card.innerHTML = `
-      <h3>${match.title}</h3>
-      <p>${match.company}</p>
-      <span class="match-pill">${match.match_score}% Match</span>
-    `;
-
-    container.appendChild(card);
-  });
-}
-
-function displayJobs() {
-  const container = document.getElementById("jobList");
-  const loadBtn = document.getElementById("loadMoreJobs");
-  container.innerHTML = "";
-
-  let combined = jobs.map((job) => {
-    const match = matchResults.find((m) => m.job_id === job.id);
+  return jobs.map((job) => {
+    const match = matchMap.get(
+      normalizeId(job.id)
+    );
 
     return {
       ...job,
-      match_score: match ? match.match_score : 0,
-      matched_skills: match ? match.matched_skills : [],
-      missing_skills: match ? match.missing_skills : [],
-      explanation: match ? match.explanation : "No match data yet.",
+      match_score: match
+        ? match.match_score
+        : 0,
+      matched_skills: match
+        ? match.matched_skills
+        : [],
+      missing_skills: match
+        ? match.missing_skills
+        : [],
+      explanation: match
+        ? match.explanation
+        : "Add profile details to improve matches.",
     };
   });
+}
 
-  combined = applyFilters(combined);
-  const total = combined.length;
-  const slice = combined.slice(0, visibleJobsCount);
+/* =========================
+   RECOMMENDATIONS
+========================= */
 
-  document.getElementById("resultsCount").textContent = `${slice.length} of ${total} results`;
+function renderRecommendations() {
+  const container =
+    document.getElementById(
+      "recommendedJobs"
+    );
 
-  if (loadBtn) {
-    loadBtn.style.display = visibleJobsCount >= total ? "none" : "inline-block";
-  }
+  if (!container) return;
 
-  slice.forEach((job) => {
-    const card = document.createElement("div");
-    card.className = "job-card";
+  container.innerHTML = "";
 
-    card.addEventListener("click", () => openJobModal(job.id));
+  const topJobs = getCombinedJobs()
+    .sort(
+      (a, b) =>
+        (b.match_score || 0) -
+        (a.match_score || 0)
+    )
+    .slice(0, 3);
 
-    const descSnippet = truncateText(job.description || "", 150);
-    const jt = job.job_type || "—";
-    const savedLabel = isJobSaved(job) ? "Saved ✓" : "Save";
-
-    card.innerHTML = `
-      <div style="display:flex;justify-content:space-between;">
-        <div>
-          <div class="job-title">${job.title}</div>
-          <div class="job-company">${job.company} • ${job.location || "Location not listed"}</div>
-          <div style="margin-top:6px;"><span class="tag" style="background:#ede7f6;color:#4a148c;">${jt}</span></div>
-        </div>
-
-        <div style="text-align:right;">
-          <span class="tag">${job.salary_range || "Salary not listed"}</span>
-          <div style="margin-top:5px;font-weight:900;color:#3a86ff;">
-            ${job.match_score}% Match
-          </div>
-        </div>
-      </div>
-
-      <p style="margin-top:8px;font-size:0.88rem;color:#333;line-height:1.35;">${descSnippet}</p>
-
-      <div class="job-meta">
-        ${(job.skills_required || [])
-          .slice(0, 4)
-          .map((s) => `<span class="tag">${s}</span>`)
-          .join("")}
-      </div>
-
-      <p style="margin-top:10px;font-size:0.85rem;color:#444;">
-        ${job.explanation}
-      </p>
-
-      <div class="job-actions">
-        <button class="save-btn">${savedLabel}</button>
-        <button class="compare-btn">Compare</button>
+  if (topJobs.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <h3>No recommendations yet</h3>
+        <p>Add skills and profile details.</p>
       </div>
     `;
+    return;
+  }
 
-    const saveBtn = card.querySelector(".save-btn");
-    saveBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      saveJob(job);
-      displayJobs();
-    });
+  topJobs.forEach((job) => {
+    const card = document.createElement("div");
 
-    card.querySelector(".compare-btn").addEventListener("click", (e) => {
-      e.stopPropagation();
-      compareJob(job);
-    });
+    card.className = "recommended-card";
+
+    card.innerHTML = `
+      <div class="mini-label">Recommended</div>
+      <h3>${job.title}</h3>
+      <p>${job.company}</p>
+      <span class="match-pill">
+        ${job.match_score}% Match
+      </span>
+    `;
+
+    card.addEventListener("click", () =>
+      openJobModal(job.id)
+    );
 
     container.appendChild(card);
   });
 }
 
+/* =========================
+   DISPLAY JOBS
+========================= */
+
+function displayJobs() {
+  const container =
+    document.getElementById("jobList");
+
+  if (!container) return;
+
+  container.innerHTML = "";
+
+  let combined = getCombinedJobs();
+
+  combined = applyFilters(combined);
+
+  const visible = combined.slice(
+    0,
+    visibleJobsCount
+  );
+
+  visible.forEach((job) => {
+    const card = document.createElement("div");
+
+    card.className = "job-card";
+
+    const saved = isJobSaved(job.id);
+    const compared = isJobCompared(job.id);
+
+    card.innerHTML = `
+      <div class="job-card-top">
+        <div>
+          <div class="job-title">
+            ${job.title}
+          </div>
+
+          <div class="job-company">
+            ${job.company}
+            •
+            ${job.location || "Location not listed"}
+          </div>
+        </div>
+
+        <div class="match-score-box">
+          <span>${job.match_score}%</span>
+          <small>Match</small>
+        </div>
+      </div>
+
+      <div class="job-meta">
+        <span class="tag">
+          ${job.salary_range || "Salary not listed"}
+        </span>
+
+        <span class="tag">
+          ${getJobType(job)}
+        </span>
+      </div>
+
+      <div class="match-bar">
+        <div style="width:${job.match_score}%"></div>
+      </div>
+
+      <p class="job-summary">
+        ${truncateText(job.description, 150)}
+      </p>
+
+      <div class="job-actions">
+        <button class="save-btn ${saved ? "saved" : ""}">
+          ${saved ? "Saved" : "Save"}
+        </button>
+
+        <button class="compare-btn ${compared ? "compared" : ""}">
+          ${compared ? "Compared" : "Compare"}
+        </button>
+      </div>
+    `;
+
+    card.addEventListener("click", () =>
+      openJobModal(job.id)
+    );
+
+    const saveBtn =
+      card.querySelector(".save-btn");
+
+    saveBtn.addEventListener(
+      "click",
+      async (e) => {
+        e.stopPropagation();
+
+        const savedNow = await saveJob(job);
+
+        saveBtn.classList.toggle(
+          "saved",
+          savedNow
+        );
+
+        saveBtn.textContent = savedNow
+          ? "Saved"
+          : "Save";
+
+        displayJobs();
+      }
+    );
+
+    const compareBtn =
+      card.querySelector(".compare-btn");
+
+    compareBtn.addEventListener(
+      "click",
+      (e) => {
+        e.stopPropagation();
+
+        const comparedNow =
+          compareJob(job);
+
+        compareBtn.classList.toggle(
+          "compared",
+          comparedNow
+        );
+
+        compareBtn.textContent =
+          comparedNow
+            ? "Compared"
+            : "Compare";
+
+        displayJobs();
+      }
+    );
+
+    container.appendChild(card);
+  });
+}
+
+/* =========================
+   MODAL
+========================= */
+
 function openJobModal(jobId) {
-  const modal = document.getElementById("jobModal");
-  const details = document.getElementById("jobDetails");
+  const modal =
+    document.getElementById("jobModal");
 
-  const job = jobs.find((j) => j.id === jobId);
-  const match = matchResults.find((m) => m.job_id === jobId);
+  const details =
+    document.getElementById("jobDetails");
 
-  if (!job) {
-    return;
-  }
+  if (!modal || !details) return;
 
-  const reqFit = match ? match.required_skills_fit ?? 0 : 0;
-  const profFit = match ? match.profile_text_match ?? 0 : 0;
-  const keyFit = match ? match.keyword_overlap ?? 0 : 0;
-  const matchScore = match
-    ? match.match_score
-    : Math.round((reqFit + profFit + keyFit) / 3) || 0;
-  const matchedSkills = match ? match.matched_skills : [];
-  const missingSkills = match ? match.missing_skills : [];
-  const explanation = match ? match.explanation : "No match data available.";
+  const job = getCombinedJobs().find(
+    (j) =>
+      normalizeId(j.id) ===
+      normalizeId(jobId)
+  );
 
-  const applyLink = job.apply_link || "https://example.com/apply";
-  const descBlock = job.description ? `<p style="margin:10px 0;color:#333;">${job.description}</p>` : "";
+  if (!job) return;
+
+  const saved = isJobSaved(job.id);
+  const compared = isJobCompared(job.id);
 
   details.innerHTML = `
     <h2>${job.title}</h2>
-    <p><strong>${job.company}</strong> • ${job.location || "Location not listed"}</p>
-    <p><span class="tag">${job.job_type || "Job type"}</span></p>
-    ${descBlock}
 
-    <div style="margin:10px 0;">
-      <span class="tag">${job.salary_range || "Salary not listed"}</span>
-      <span class="tag" style="background:#3a86ff;color:white;">
-        ${matchScore}% Match
+    <p>
+      <strong>${job.company}</strong>
+      •
+      ${job.location || "Location not listed"}
+    </p>
+
+    <div class="job-meta modal-tags">
+      <span class="tag">
+        ${job.salary_range || "Salary not listed"}
+      </span>
+
+      <span class="tag">
+        ${getJobType(job)}
+      </span>
+
+      <span class="tag blue-tag">
+        ${job.match_score}% Match
       </span>
     </div>
 
-    <div class="why-card">
-      <h4>Why This Job?</h4>
-      <p>${explanation}</p>
+    <h3>Description</h3>
 
-      <div class="breakdown-grid">
-        <div class="breakdown-box">
-          <h5>Required skills fit</h5>
-          <span>${reqFit}%</span>
-        </div>
-        <div class="breakdown-box">
-          <h5>Profile and text</h5>
-          <span>${profFit}%</span>
-        </div>
-        <div class="breakdown-box">
-          <h5>Keyword overlap</h5>
-          <span>${keyFit}%</span>
-        </div>
-      </div>
+    <p>
+      ${job.description || "No description available."}
+    </p>
+
+    <div class="modal-actions">
+      <button
+        id="modalSaveBtn"
+        class="save-btn ${saved ? "saved" : ""}"
+      >
+        ${saved ? "Saved" : "Save Job"}
+      </button>
+
+      <button
+        id="modalCompareBtn"
+        class="compare-btn ${compared ? "compared" : ""}"
+      >
+        ${compared ? "Compared" : "Add to Compare"}
+      </button>
+
+      <a
+        class="apply-btn"
+        href="${job.apply_link || "#"}"
+        target="_blank"
+      >
+        Apply Now
+      </a>
     </div>
-
-    <h3>Matched Skills</h3>
-    <p>${matchedSkills.length ? matchedSkills.join(", ") : "None"}</p>
-
-    <h3>Missing Skills</h3>
-    <p>${missingSkills.length ? missingSkills.join(", ") : "None"}</p>
-
-    <h3>Required Skills</h3>
-    <ul>
-      ${(job.skills_required || []).map((s) => `<li>${s}</li>`).join("")}
-    </ul>
-
-    <a class="apply-btn" href="${applyLink}" target="_blank">
-      Apply Now
-    </a>
   `;
+
+  document
+    .getElementById("modalSaveBtn")
+    .addEventListener(
+      "click",
+      async () => {
+        await saveJob(job);
+
+        openJobModal(job.id);
+
+        displayJobs();
+      }
+    );
+
+  document
+    .getElementById("modalCompareBtn")
+    .addEventListener("click", () => {
+      compareJob(job);
+
+      openJobModal(job.id);
+
+      displayJobs();
+    });
 
   modal.classList.remove("hidden");
 }
 
-document.getElementById("closeModal").addEventListener("click", () => {
-  document.getElementById("jobModal").classList.add("hidden");
-});
+/* =========================
+   EVENTS
+========================= */
 
-function persistJobFilters() {
-  try {
-    localStorage.setItem("bridge_job_title_tags", JSON.stringify(jobTitleTags));
-    localStorage.setItem("bridge_job_categories", JSON.stringify([...selectedCategoryLabels]));
-  } catch (_) {
-    /* ignore */
-  }
-}
+function setupEvents() {
+  document
+    .querySelectorAll(".bubble")
+    .forEach((bubble) => {
+      bubble.addEventListener(
+        "click",
+        () => {
+          const type =
+            bubble.dataset.type;
 
-function loadJobFilterPrefs() {
-  try {
-    const t = JSON.parse(localStorage.getItem("bridge_job_title_tags") || "[]");
-    if (Array.isArray(t)) {
-      jobTitleTags.length = 0;
-      t.forEach((x) => {
-        const v = String(x).trim();
-        if (v && !jobTitleTags.includes(v)) {
-          jobTitleTags.push(v);
+          document
+            .querySelectorAll(".bubble")
+            .forEach((b) =>
+              b.classList.remove(
+                "active-bubble"
+              )
+            );
+
+          if (selectedType === type) {
+            selectedType = null;
+          } else {
+            selectedType = type;
+
+            bubble.classList.add(
+              "active-bubble"
+            );
+          }
+
+          resetVisibleJobs();
+
+          displayJobs();
         }
-      });
-    }
-  } catch (_) {
-    /* ignore */
-  }
-  try {
-    const c = JSON.parse(localStorage.getItem("bridge_job_categories") || "[]");
-    if (Array.isArray(c)) {
-      selectedCategoryLabels.clear();
-      c.forEach((x) => {
-        const v = String(x).trim();
-        if (v) {
-          selectedCategoryLabels.add(v);
-        }
-      });
-    }
-  } catch (_) {
-    /* ignore */
-  }
-}
-
-function buildCategoryCheckboxes() {
-  const host = document.getElementById("jobCategoryChecks");
-  if (!host) {
-    return;
-  }
-  host.innerHTML = "";
-  JOB_CATEGORIES.forEach((c) => {
-    const row = document.createElement("label");
-    row.className = "job-cat-row";
-    const cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.value = c.label;
-    cb.checked = selectedCategoryLabels.has(c.label);
-    cb.addEventListener("change", () => {
-      if (cb.checked) {
-        selectedCategoryLabels.add(c.label);
-      } else {
-        selectedCategoryLabels.delete(c.label);
-      }
-      persistJobFilters();
-      resetVisibleJobs();
-      displayJobs();
+      );
     });
-    const span = document.createElement("span");
-    span.textContent = c.label;
-    row.appendChild(cb);
-    row.appendChild(span);
-    host.appendChild(row);
-  });
+
+  const filterBtn =
+    document.getElementById(
+      "filterBtn"
+    );
+
+  if (filterBtn) {
+    filterBtn.addEventListener(
+      "click",
+      async () => {
+        saveCurrentFiltersToProfile();
+
+        const profile =
+          getUserProfile();
+
+        matchResults =
+          await fetchMatches(
+            skillTags,
+            courseTags,
+            expTags,
+            profile.resume_text || ""
+          );
+
+        resetVisibleJobs();
+
+        renderRecommendations();
+
+        displayJobs();
+
+        showToast(
+          "Filters applied."
+        );
+      }
+    );
+  }
+
+  const sortSelect =
+    document.getElementById(
+      "sortSelect"
+    );
+
+  if (sortSelect) {
+    sortSelect.addEventListener(
+      "change",
+      (e) => {
+        currentSort =
+          e.target.value;
+
+        resetVisibleJobs();
+
+        displayJobs();
+      }
+    );
+  }
+
+  const closeModal =
+    document.getElementById(
+      "closeModal"
+    );
+
+  if (closeModal) {
+    closeModal.addEventListener(
+      "click",
+      () => {
+        document
+          .getElementById(
+            "jobModal"
+          )
+          .classList.add(
+            "hidden"
+          );
+      }
+    );
+  }
 }
 
-document.getElementById("filterBtn").addEventListener("click", async () => {
-  persistJobFilters();
+/* =========================
+   FILTER CALLBACKS
+========================= */
 
-  matchResults = await fetchMatchesFromProfile();
+function onFilterTagsChanged() {
   resetVisibleJobs();
-  renderRecommendations();
-  displayJobs();
-});
 
-document.getElementById("clearBtn").addEventListener("click", async () => {
-  jobTitleTags.length = 0;
-  selectedCategoryLabels.clear();
-  renderTagBubbles("jobTitleBubbles", jobTitleTags);
-  document.getElementById("locationInput").value = "";
-  document.getElementById("jobTitleInput").value = "";
-
-  selectedType = null;
-  document.querySelectorAll("aside.sidebar .type-bubbles .bubble").forEach((b) => b.classList.remove("active-bubble"));
-
-  buildCategoryCheckboxes();
-  persistJobFilters();
-
-  saveUserProfile({ skills: [], courses: [], projects: [], resume_text: "" });
-
-  matchResults = await fetchMatchesFromProfile();
-  resetVisibleJobs();
-  renderRecommendations();
-  displayJobs();
-});
-
-const jobsSidebar = document.querySelector("aside.sidebar");
-if (jobsSidebar) {
-  jobsSidebar.addEventListener("click", (e) => {
-    const btn = e.target.closest(".type-bubbles .bubble");
-    if (!btn || !btn.dataset.type) {
-      return;
-    }
-    e.preventDefault();
-    e.stopPropagation();
-    const t = btn.dataset.type;
-    if (selectedType === t) {
-      selectedType = null;
-      jobsSidebar.querySelectorAll(".type-bubbles .bubble").forEach((b) => b.classList.remove("active-bubble"));
-    } else {
-      selectedType = t;
-      jobsSidebar.querySelectorAll(".type-bubbles .bubble").forEach((b) => b.classList.remove("active-bubble"));
-      btn.classList.add("active-bubble");
-    }
-    resetVisibleJobs();
-    displayJobs();
-  });
-}
-
-document.getElementById("sortSelect").addEventListener("change", (e) => {
-  currentSort = e.target.value;
-  resetVisibleJobs();
-  displayJobs();
-});
-
-const loadMoreBtn = document.getElementById("loadMoreJobs");
-if (loadMoreBtn) {
-  loadMoreBtn.addEventListener("click", () => {
-    visibleJobsCount += JOBS_PAGE_INCREMENT;
-    displayJobs();
-  });
-}
-
-function onJobTitleTagsChanged() {
-  persistJobFilters();
-  resetVisibleJobs();
   displayJobs();
 }
+
+/* =========================
+   INIT
+========================= */
 
 async function init() {
   updateSavedCount();
-  await fetchSavedJobIdsFromServer();
+
+  setupEvents();
+
+  setupBubbleInput(
+    "skillsInput",
+    "skillsBubbles",
+    skillTags,
+    onFilterTagsChanged
+  );
+
+  setupBubbleInput(
+    "courseworkInput",
+    "courseworkBubbles",
+    courseTags,
+    onFilterTagsChanged
+  );
+
+  setupBubbleInput(
+    "experienceInput",
+    "experienceBubbles",
+    expTags,
+    onFilterTagsChanged
+  );
+
+  loadProfileFilters();
 
   loadJobFilterPrefs();
+
   buildCategoryCheckboxes();
-  setupBubbleInput("jobTitleInput", "jobTitleBubbles", jobTitleTags, onJobTitleTagsChanged);
-  renderTagBubbles("jobTitleBubbles", jobTitleTags);
+
+  await fetchSavedJobIdsFromServer();
 
   await fetchJobs();
 
-  matchResults = await fetchMatchesFromProfile();
+  const profile = getUserProfile();
+
+  matchResults =
+    await fetchMatches(
+      profile.skills || [],
+      profile.courses || [],
+      profile.projects || [],
+      profile.resume_text || ""
+    );
 
   renderRecommendations();
+
   displayJobs();
 }
 
