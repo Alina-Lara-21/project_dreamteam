@@ -107,11 +107,10 @@ def _education_text_blob(row: Any) -> str:
     parts: list[str] = []
     for entry in _parse_json_list(getattr(row, "education_json", None)):
         if isinstance(entry, dict):
-            for key in ("school", "program", "course", "label"):
+            for key in ("school", "program", "course", "label", "description", "title"):
                 s = str(entry.get(key) or "").strip()
                 if s:
                     parts.append(s)
-                    break
         elif isinstance(entry, str) and entry.strip():
             parts.append(entry.strip())
     return " ".join(parts)

@@ -103,6 +103,31 @@ def test_match_merges_saved_profile(client):
     assert len(matches) > 0
 
 
+def test_match_returns_score_breakdown(client):
+    r = client.post(
+        "/match",
+        json={
+            "skills": ["python", "sql"],
+            "courses": [],
+            "projects": ["Software engineering intern", "frontend development with React"],
+            "resume_text": "Computer science major coursework in algorithms.",
+        },
+    )
+    assert r.status_code == 200
+    matches = r.json()["matches"]
+    assert len(matches) > 0
+    m = matches[0]
+    assert "match_score" in m
+    assert "required_skills_fit" in m
+    assert "profile_text_match" in m
+    assert "keyword_overlap" in m
+    assert 0 <= m["match_score"] <= 100
+    expected_total = int(
+        round((m["required_skills_fit"] + m["profile_text_match"] + m["keyword_overlap"]) / 3.0),
+    )
+    assert m["match_score"] == expected_total
+
+
 def test_ai_search_smoke(client):
     r = client.post(
         "/ai/search",

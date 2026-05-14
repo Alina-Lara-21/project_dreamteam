@@ -28,6 +28,9 @@ class MatchResult(BaseModel):
     title: str
     company: str
     match_score: int
+    required_skills_fit: int = 0
+    profile_text_match: int = 0
+    keyword_overlap: int = 0
     matched_skills: list[str] = Field(default_factory=list)
     missing_skills: list[str] = Field(default_factory=list)
     explanation: str

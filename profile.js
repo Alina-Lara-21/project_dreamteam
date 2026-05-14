@@ -151,8 +151,13 @@ function parseEducationJson(raw) {
       .map((row, i) => {
         if (!row || typeof row !== "object") return null;
         const school = String(row.school || row.program || row.course || row.label || "").trim();
-        if (!school) return null;
-        return { id: row.id != null ? String(row.id) : `edu-${i}`, school };
+        const description = String(row.description || "").trim();
+        if (!school && !description) return null;
+        return {
+          id: row.id != null ? String(row.id) : `edu-${i}`,
+          school,
+          description,
+        };
       })
       .filter(Boolean);
   } catch {
@@ -236,8 +241,21 @@ function renderEducation() {
       educationEntries[index].school = schoolEl.value;
     });
 
+    const ld = document.createElement("label");
+    ld.textContent = "Details (optional)";
+    const descEl = document.createElement("textarea");
+    descEl.className = "edu-desc";
+    descEl.rows = 2;
+    descEl.placeholder = "Focus, honors, relevant coursework…";
+    descEl.value = entry.description || "";
+    descEl.addEventListener("input", () => {
+      educationEntries[index].description = descEl.value;
+    });
+
     fields.appendChild(ls);
     fields.appendChild(schoolEl);
+    fields.appendChild(ld);
+    fields.appendChild(descEl);
 
     const actions = document.createElement("div");
     actions.className = "profile-entry-actions";
@@ -263,8 +281,9 @@ function readFormPayload() {
     title: String(title || "").trim(),
     description: String(description || "").trim(),
   }));
-  const eduPayload = educationEntries.map(({ school }) => ({
+  const eduPayload = educationEntries.map(({ school, description }) => ({
     school: String(school || "").trim(),
+    description: String(description || "").trim(),
   }));
   return {
     full_name: nameInput.value.trim(),
@@ -352,7 +371,7 @@ function setProfileLocked(locked) {
   experienceList?.querySelectorAll("input, textarea, button").forEach((el) => {
     el.disabled = locked;
   });
-  educationList?.querySelectorAll("input, button").forEach((el) => {
+  educationList?.querySelectorAll("input, textarea, button").forEach((el) => {
     el.disabled = locked;
   });
   clearBtn.innerText = locked ? "Edit Profile" : "Clear Profile";
@@ -541,7 +560,7 @@ function bindEvents() {
   });
   addEducationBtn?.addEventListener("click", () => {
     if (profileLocked) return;
-    educationEntries.push({ id: `edu-${Date.now()}`, school: "" });
+    educationEntries.push({ id: `edu-${Date.now()}`, school: "", description: "" });
     renderEducation();
   });
 }

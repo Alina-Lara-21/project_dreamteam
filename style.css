@@ -113,6 +113,8 @@ body {
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 8px;
+  position: relative;
+  z-index: 2;
 }
 
 .bubble {
@@ -924,10 +926,11 @@ button.secondary:hover {
 }
 
 .profile-entry-card {
-  border: 1px solid #e6ecf5;
-  border-radius: 14px;
-  padding: 14px;
-  background: #fafbff;
+  border: 1px solid #e1e8f2;
+  border-radius: 16px;
+  padding: 16px 16px 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
+  box-shadow: 0 4px 14px rgba(13, 27, 42, 0.06);
   display: flex;
   gap: 14px;
   justify-content: space-between;

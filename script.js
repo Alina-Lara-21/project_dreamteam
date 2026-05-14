@@ -124,7 +124,14 @@ function jobMatchesSelectedType(job) {
   if (!selectedType) {
     return true;
   }
-  return normalizeTypeLabel(job.job_type) === normalizeTypeLabel(selectedType);
+  const jt = normalizeTypeLabel(job.job_type || "");
+  const sel = normalizeTypeLabel(selectedType);
+  if (jt === sel) {
+    return true;
+  }
+  const jx = jt.replace(/-/g, "");
+  const sx = sel.replace(/-/g, "");
+  return jx === sx;
 }
 
 async function fetchSavedJobIdsFromServer() {
@@ -286,6 +293,7 @@ async function buildMatchProfileBody() {
         ed.forEach((row) => {
           if (row && typeof row === "object") {
             eduBlob += ` ${row.school || row.program || row.course || ""}`;
+            eduBlob += ` ${row.description || ""}`;
           }
         });
       }
@@ -596,14 +604,15 @@ function openJobModal(jobId) {
     return;
   }
 
-  const matchScore = match ? match.match_score : 0;
+  const reqFit = match ? match.required_skills_fit ?? 0 : 0;
+  const profFit = match ? match.profile_text_match ?? 0 : 0;
+  const keyFit = match ? match.keyword_overlap ?? 0 : 0;
+  const matchScore = match
+    ? match.match_score
+    : Math.round((reqFit + profFit + keyFit) / 3) || 0;
   const matchedSkills = match ? match.matched_skills : [];
   const missingSkills = match ? match.missing_skills : [];
   const explanation = match ? match.explanation : "No match data available.";
-
-  const skillScore = Math.min(70, matchScore);
-  const profileScore = Math.min(20, Math.max(0, matchScore - 50));
-  const keywordScore = Math.min(10, Math.max(0, matchScore - 80));
 
   const applyLink = job.apply_link || "https://example.com/apply";
   const descBlock = job.description ? `<p style="margin:10px 0;color:#333;">${job.description}</p>` : "";
@@ -628,15 +637,15 @@ function openJobModal(jobId) {
       <div class="breakdown-grid">
         <div class="breakdown-box">
           <h5>Required skills fit</h5>
-          <span>${skillScore}%</span>
+          <span>${reqFit}%</span>
         </div>
         <div class="breakdown-box">
           <h5>Profile and text</h5>
-          <span>${profileScore}%</span>
+          <span>${profFit}%</span>
         </div>
         <div class="breakdown-box">
           <h5>Keyword overlap</h5>
-          <span>${keywordScore}%</span>
+          <span>${keyFit}%</span>
         </div>
       </div>
     </div>
@@ -752,7 +761,7 @@ document.getElementById("clearBtn").addEventListener("click", async () => {
   document.getElementById("jobTitleInput").value = "";
 
   selectedType = null;
-  document.querySelectorAll(".bubble").forEach((b) => b.classList.remove("active-bubble"));
+  document.querySelectorAll("aside.sidebar .type-bubbles .bubble").forEach((b) => b.classList.remove("active-bubble"));
 
   buildCategoryCheckboxes();
   persistJobFilters();
@@ -765,17 +774,28 @@ document.getElementById("clearBtn").addEventListener("click", async () => {
   displayJobs();
 });
 
-document.querySelectorAll(".bubble").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    selectedType = btn.dataset.type;
-
-    document.querySelectorAll(".bubble").forEach((b) => b.classList.remove("active-bubble"));
-    btn.classList.add("active-bubble");
-
+const jobsSidebar = document.querySelector("aside.sidebar");
+if (jobsSidebar) {
+  jobsSidebar.addEventListener("click", (e) => {
+    const btn = e.target.closest(".type-bubbles .bubble");
+    if (!btn || !btn.dataset.type) {
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    const t = btn.dataset.type;
+    if (selectedType === t) {
+      selectedType = null;
+      jobsSidebar.querySelectorAll(".type-bubbles .bubble").forEach((b) => b.classList.remove("active-bubble"));
+    } else {
+      selectedType = t;
+      jobsSidebar.querySelectorAll(".type-bubbles .bubble").forEach((b) => b.classList.remove("active-bubble"));
+      btn.classList.add("active-bubble");
+    }
     resetVisibleJobs();
     displayJobs();
   });
-});
+}
 
 document.getElementById("sortSelect").addEventListener("change", (e) => {
   currentSort = e.target.value;
